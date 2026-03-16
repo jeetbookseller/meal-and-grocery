@@ -53,31 +53,14 @@ export const useHouseholdStore = defineStore('household', () => {
     error.value = null
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (userError || !user) throw userError ?? new Error('Not authenticated')
-
-      const { data: household, error: insertError } = await supabase
-        .from('households')
-        .insert({ name })
-        .select('id, name')
-        .single()
-
-      if (insertError) throw insertError
-
-      const { error: memberError } = await supabase
-        .from('household_members')
-        .insert({ household_id: household.id, user_id: user.id })
-
-      if (memberError) throw memberError
-
-      const { error: seedError } = await supabase.rpc('seed_default_sections', {
-        p_household_id: household.id,
+      const { data, error: rpcError } = await supabase.rpc('create_household', {
+        p_name: name,
       })
 
-      if (seedError) throw seedError
+      if (rpcError) throw rpcError
 
-      householdId.value = household.id
-      householdName.value = household.name
+      householdId.value = data.id
+      householdName.value = data.name
       needsHousehold.value = false
       ready.value = true
     } catch (e: any) {
