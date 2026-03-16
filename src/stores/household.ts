@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 export const useHouseholdStore = defineStore('household', () => {
   const householdId = ref<string | null>(null)
   const householdName = ref<string | null>(null)
+  const inviteCode = ref<string | null>(null)
   const ready = ref(false)
   const needsHousehold = ref(false)
   const loading = ref(false)
@@ -61,6 +62,7 @@ export const useHouseholdStore = defineStore('household', () => {
 
       householdId.value = data.id
       householdName.value = data.name
+      inviteCode.value = data.invite_code
       needsHousehold.value = false
       ready.value = true
     } catch (e: any) {
@@ -70,5 +72,38 @@ export const useHouseholdStore = defineStore('household', () => {
     }
   }
 
-  return { householdId, householdName, ready, needsHousehold, loading, error, init, createHousehold }
+  async function joinHousehold(code: string) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc('join_household', {
+        p_invite_code: code,
+      })
+
+      if (rpcError) throw rpcError
+
+      householdId.value = data.id
+      householdName.value = data.name
+      needsHousehold.value = false
+      ready.value = true
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to join household'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    householdId,
+    householdName,
+    inviteCode,
+    ready,
+    needsHousehold,
+    loading,
+    error,
+    init,
+    createHousehold,
+    joinHousehold,
+  }
 })
