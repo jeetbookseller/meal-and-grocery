@@ -104,7 +104,7 @@
 
     <!-- Invite code display (shown after creating a household) -->
     <div
-      v-else-if="householdStore.ready && householdStore.inviteCode && !inviteCodeDismissed"
+      v-else-if="householdStore.justCreated && !inviteCodeDismissed"
       class="flex items-center justify-center min-h-[calc(100vh-56px)]"
     >
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 w-full max-w-sm text-center">
