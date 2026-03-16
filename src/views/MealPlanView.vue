@@ -1,8 +1,9 @@
 <template>
   <div>
     <TimelineSelector />
-    <!-- Mobile: horizontal scroll; Desktop: 7-column grid -->
-    <div class="mt-4 overflow-x-auto">
+    <BaseSpinner v-if="mealsStore.loading" />
+    <BaseErrorBanner v-else-if="mealsStore.error" :message="mealsStore.error" />
+    <div v-else class="mt-4 overflow-x-auto">
       <div
         class="grid gap-3"
         :style="{ gridTemplateColumns: `repeat(${dateRange.length}, minmax(160px, 1fr))` }"
@@ -23,6 +24,8 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useMealsStore } from '@/stores/meals'
 import TimelineSelector from '@/components/TimelineSelector.vue'
 import DayColumn from '@/components/DayColumn.vue'
+import BaseSpinner from '@/components/base/BaseSpinner.vue'
+import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
 
 const mealsStore = useMealsStore()
 

@@ -3,21 +3,26 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
-const { mockSetRange, mockSubscribeRealtime, mockUnsubscribeRealtime } = vi.hoisted(() => ({
-  mockSetRange: vi.fn(),
-  mockSubscribeRealtime: vi.fn(),
-  mockUnsubscribeRealtime: vi.fn(),
-}))
-
-vi.mock('@/stores/meals', () => ({
-  useMealsStore: () => ({
-    setRange: mockSetRange,
-    subscribeRealtime: mockSubscribeRealtime,
-    unsubscribeRealtime: mockUnsubscribeRealtime,
-    // Pre-populated so the dateRange computed renders 7 day columns
+const { mockSetRange, mockSubscribeRealtime, mockUnsubscribeRealtime, mockStoreState } = vi.hoisted(() => {
+  const mockStoreState = {
+    setRange: vi.fn(),
+    subscribeRealtime: vi.fn(),
+    unsubscribeRealtime: vi.fn(),
     selectedRange: { start: '2026-03-16', end: '2026-03-22' },
     mealsByDate: {},
-  }),
+    loading: false,
+    error: null as string | null,
+  }
+  return {
+    mockSetRange: mockStoreState.setRange,
+    mockSubscribeRealtime: mockStoreState.subscribeRealtime,
+    mockUnsubscribeRealtime: mockStoreState.unsubscribeRealtime,
+    mockStoreState,
+  }
+})
+
+vi.mock('@/stores/meals', () => ({
+  useMealsStore: () => mockStoreState,
 }))
 
 // Stub child components — implemented in TASK-07/08 respectively
@@ -41,6 +46,9 @@ describe('MealPlanView', () => {
     mockSetRange.mockReset()
     mockSubscribeRealtime.mockReset()
     mockUnsubscribeRealtime.mockReset()
+    mockStoreState.loading = false
+    mockStoreState.error = null
+    mockStoreState.selectedRange = { start: '2026-03-16', end: '2026-03-22' }
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-03-16T12:00:00.000Z'))
   })
@@ -80,5 +88,30 @@ describe('MealPlanView', () => {
   it('renders the TimelineSelector component', () => {
     const wrapper = mount(MealPlanView)
     expect(wrapper.find('.timeline-selector-stub').exists()).toBe(true)
+  })
+
+  it('shows loading spinner when loading', () => {
+    mockStoreState.loading = true
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('[data-testid="base-spinner"]').exists()).toBe(true)
+  })
+
+  it('hides day columns when loading', () => {
+    mockStoreState.loading = true
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('.day-column-stub').exists()).toBe(false)
+  })
+
+  it('shows error banner when error is set', () => {
+    mockStoreState.error = 'Failed to fetch meals'
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('[data-testid="base-error-banner"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Failed to fetch meals')
+  })
+
+  it('hides day columns when error is set', () => {
+    mockStoreState.error = 'Some error'
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('.day-column-stub').exists()).toBe(false)
   })
 })
