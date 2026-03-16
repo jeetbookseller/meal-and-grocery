@@ -3,6 +3,7 @@ export type MealType = 'breakfast' | 'lunch' | 'dinner'
 export interface Household {
   id: string
   name: string
+  invite_code: string
   created_at: string
 }
 
@@ -87,6 +88,14 @@ export interface Database {
       seed_default_sections: {
         Args: { p_household_id: string }
         Returns: void
+      }
+      create_household: {
+        Args: { p_name: string }
+        Returns: { id: string; name: string; invite_code: string }
+      }
+      join_household: {
+        Args: { p_invite_code: string }
+        Returns: { id: string; name: string }
       }
     }
   }
