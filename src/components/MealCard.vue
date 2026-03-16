@@ -38,7 +38,7 @@
         <button
           data-testid="edit-btn"
           aria-label="Edit meal"
-          class="p-1 text-gray-400 hover:text-gray-600 rounded"
+          class="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 rounded"
           @click="editOpen = true"
         >
           <!-- pencil icon -->
@@ -49,7 +49,7 @@
         <button
           data-testid="delete-btn"
           aria-label="Delete meal"
-          class="p-1 text-gray-400 hover:text-red-500 rounded"
+          class="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 rounded"
           @click="handleDelete"
         >
           <!-- trash icon -->

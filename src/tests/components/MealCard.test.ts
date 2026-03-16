@@ -133,4 +133,21 @@ describe('MealCard', () => {
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[data-testid="edit-modal"]').exists()).toBe(false)
   })
+
+  // ─── Mobile responsiveness: touch targets ───────────────────────────────────
+  it('edit button meets 44px touch target (min-w-[44px] and min-h-[44px])', async () => {
+    const { default: MealCard } = await import('@/components/MealCard.vue')
+    const wrapper = mount(MealCard, { props: { meal: baseMeal } })
+    const editBtn = wrapper.find('[data-testid="edit-btn"]')
+    expect(editBtn.classes()).toContain('min-w-[44px]')
+    expect(editBtn.classes()).toContain('min-h-[44px]')
+  })
+
+  it('delete button meets 44px touch target (min-w-[44px] and min-h-[44px])', async () => {
+    const { default: MealCard } = await import('@/components/MealCard.vue')
+    const wrapper = mount(MealCard, { props: { meal: baseMeal } })
+    const deleteBtn = wrapper.find('[data-testid="delete-btn"]')
+    expect(deleteBtn.classes()).toContain('min-w-[44px]')
+    expect(deleteBtn.classes()).toContain('min-h-[44px]')
+  })
 })

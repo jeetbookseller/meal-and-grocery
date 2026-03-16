@@ -1,11 +1,13 @@
 <template>
   <div data-testid="grocery-item" class="flex items-center gap-2 py-2 px-1">
-    <input
-      type="checkbox"
-      :checked="item.is_checked"
-      class="h-5 w-5 rounded border-gray-300 text-indigo-600 cursor-pointer"
-      @change="groceryStore.toggleChecked(item.id)"
-    />
+    <label class="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer">
+      <input
+        type="checkbox"
+        :checked="item.is_checked"
+        class="h-5 w-5 rounded border-gray-300 text-indigo-600"
+        @change="groceryStore.toggleChecked(item.id)"
+      />
+    </label>
     <div class="flex-1 min-w-0">
       <span :class="['text-sm', item.is_checked ? 'line-through text-gray-400' : 'text-gray-800']">
         {{ item.name }}
