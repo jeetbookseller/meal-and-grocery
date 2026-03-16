@@ -73,7 +73,7 @@ Tasks are grouped by dependency tier. All tasks within a group can be worked in 
 
 ---
 
-### Group 0 — Foundation *(no dependencies — start here)*
+### Group 0 — Foundation ✅ COMPLETE
 
 Both tasks are independent and can be done in parallel.
 
@@ -98,7 +98,7 @@ Both tasks are independent and can be done in parallel.
 
 ---
 
-### Group 1 — Auth + Household *(after Group 0)*
+### Group 1 — Auth + Household ✅ COMPLETE
 
 #### TASK-03: Auth store + LoginView
 - `stores/auth.ts`: call `supabase.auth.getSession()` on app init; subscribe to `onAuthStateChange` for the app lifetime; expose `login(email, password)`, `signup(email, password)`, `logout()`, `user`, `session`, `loading`
@@ -113,7 +113,7 @@ Both tasks are independent and can be done in parallel.
 
 ---
 
-### Group 2 — Data Stores *(after Group 1)*
+### Group 2 — Data Stores ✅ COMPLETE
 
 Both stores are independent and can be built in parallel.
 
@@ -136,7 +136,7 @@ Both stores are independent and can be built in parallel.
 
 ---
 
-### Group 3 — Core UI Components *(after Group 2)*
+### Group 3 — Core UI Components ✅ COMPLETE
 
 All five tasks are independent and can be built in parallel.
 
@@ -164,7 +164,7 @@ All five tasks are independent and can be built in parallel.
 
 ---
 
-### Group 4 — Cross-Cutting Concerns *(after Group 3)*
+### Group 4 — Cross-Cutting Concerns ✅ COMPLETE
 
 All four tasks are independent and can be built in parallel.
 
@@ -194,37 +194,70 @@ All four tasks are independent and can be built in parallel.
 
 ---
 
-### Group 5 — Post-MVP Nice-to-Haves *(after Group 4, MVP must be stable first)*
+### Group 5 — Polish & Onboarding *(after Group 4, MVP must be stable first)*
 
-#### TASK-16: Drag-to-reorder meals within a day
-- Integrate `vue-draggable-plus`
-- On drop: recompute `sort_order` for affected meals; batch-call `mealsStore.updateMeal`
+Both tasks are independent and can be built in parallel.
 
-#### TASK-17: Grocery section drag-to-reorder
-- Same drag approach as TASK-16 for the `GrocerySection` list
-- Calls `groceryStore.reorderSections(orderedIds)` which batch-updates `sort_order`
-
-#### TASK-18: Household invite / second user onboarding
+#### TASK-16: Household invite / second user onboarding
 - Add `invite_code` (short random string) column to `households` table
 - After household creation, display the invite code to the first user
 - Second user: on first login with no household, show "Join existing household" option with a code input field → `householdStore.joinHousehold(code)`
+
+#### TASK-17: Design modernization
+- Audit the full app UI and establish a consistent visual design system (color palette, typography scale, spacing, border radii, shadows)
+- Replace ad-hoc Tailwind classes with a coherent design token set (via `tailwind.config.ts` theme extension)
+- Modernize component styling: cards with subtle shadows and rounded corners, smooth transitions on interactive elements, consistent focus rings for accessibility
+- Improve `TopNav`: refined tab design with active indicator, polished user avatar/logout area
+- Improve `MealCard`: cleaner layout, better meal-type badge styling, hover/active states
+- Improve `GroceryItem` + `GrocerySection`: refined checkbox, better spacing, section header polish
+- Improve modals (`MealEditModal`, `MealLinkPicker`): backdrop blur, entrance animation, consistent button styles
+- Ensure design is cohesive across both light and dark system color schemes (or explicitly commit to light-only with a comment)
+- **Deliverable**: visually polished app that feels intentional and modern, not a default Tailwind skeleton
+
+---
+
+### Group 6 — Drag-to-Reorder *(after Group 5)*
+
+Both tasks are independent and can be built in parallel.
+
+#### TASK-18: Drag-to-reorder meals within a day
+- Integrate `vue-draggable-plus`
+- On drop: recompute `sort_order` for affected meals; batch-call `mealsStore.updateMeal`
+
+#### TASK-19: Grocery section drag-to-reorder
+- Same drag approach as TASK-18 for the `GrocerySection` list
+- Calls `groceryStore.reorderSections(orderedIds)` which batch-updates `sort_order`
+
+---
+
+## Next Steps (after Group 4)
+
+The MVP is feature-complete. Before starting Group 5, do the following:
+
+1. **End-to-end smoke test** — log in as both users, create a household, add meals for the week, build a grocery list, link items to meals, check items off. Verify Realtime sync works across two browser tabs.
+2. **Fix any critical bugs** found during the smoke test before moving on.
+3. **Confirm GitHub Pages deployment** is live and accessible at the expected URL with correct hash routing.
+4. **Review PWA install prompt** on mobile (iOS Safari + Android Chrome) — ensure the manifest and service worker are registered correctly.
+5. **Accessibility pass** — keyboard navigation through all interactive elements, screen reader labels on icon-only buttons.
 
 ---
 
 ## Parallel Execution Map
 
 ```
-Group 0 (both in parallel):        TASK-01, TASK-02
+Group 0 (both in parallel):        TASK-01, TASK-02  ✅
   ↓
-Group 1 (both in parallel):        TASK-03, TASK-04
+Group 1 (both in parallel):        TASK-03, TASK-04  ✅
   ↓
-Group 2 (both in parallel):        TASK-05, TASK-06
+Group 2 (both in parallel):        TASK-05, TASK-06  ✅
   ↓
-Group 3 (all 5 in parallel):       TASK-07, TASK-08, TASK-09, TASK-10, TASK-11
+Group 3 (all 5 in parallel):       TASK-07, TASK-08, TASK-09, TASK-10, TASK-11  ✅
   ↓
-Group 4 (all 4 in parallel):       TASK-12, TASK-13, TASK-14, TASK-15
+Group 4 (all 4 in parallel):       TASK-12, TASK-13, TASK-14, TASK-15  ✅
   ↓
-Group 5 (all 3 in parallel, MVP+): TASK-16, TASK-17, TASK-18
+Group 5 (both in parallel):        TASK-16, TASK-17
+  ↓
+Group 6 (both in parallel):        TASK-18, TASK-19
 ```
 
 ---
