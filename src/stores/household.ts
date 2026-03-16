@@ -41,8 +41,8 @@ export const useHouseholdStore = defineStore('household', () => {
       } else {
         needsHousehold.value = true
       }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load household'
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to load household'
     } finally {
       loading.value = false
     }
@@ -80,8 +80,8 @@ export const useHouseholdStore = defineStore('household', () => {
       householdName.value = household.name
       needsHousehold.value = false
       ready.value = true
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create household'
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to create household'
     } finally {
       loading.value = false
     }
