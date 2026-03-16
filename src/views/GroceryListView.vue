@@ -3,17 +3,12 @@
     <h2 class="text-xl font-semibold mb-4">Grocery List</h2>
 
     <!-- Loading -->
-    <div v-if="groceryStore.loading" data-testid="loading-spinner" class="flex justify-center py-8">
-      <svg class="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
+    <div v-if="groceryStore.loading" data-testid="loading-spinner">
+      <BaseSpinner />
     </div>
 
     <!-- Error -->
-    <div v-else-if="groceryStore.error" class="p-3 mb-4 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-      {{ groceryStore.error }}
-    </div>
+    <BaseErrorBanner v-else-if="groceryStore.error" :message="groceryStore.error" />
 
     <!-- Empty state -->
     <div
@@ -49,6 +44,8 @@ import { useGroceryStore } from '@/stores/grocery'
 import GrocerySection from '@/components/GrocerySection.vue'
 import AddSectionButton from '@/components/AddSectionButton.vue'
 import ClearCheckedButton from '@/components/ClearCheckedButton.vue'
+import BaseSpinner from '@/components/base/BaseSpinner.vue'
+import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
 
 const groceryStore = useGroceryStore()
 
