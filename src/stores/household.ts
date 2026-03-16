@@ -8,6 +8,7 @@ export const useHouseholdStore = defineStore('household', () => {
   const inviteCode = ref<string | null>(null)
   const ready = ref(false)
   const needsHousehold = ref(false)
+  const justCreated = ref(false)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -65,6 +66,7 @@ export const useHouseholdStore = defineStore('household', () => {
       householdName.value = data.name
       inviteCode.value = data.invite_code
       needsHousehold.value = false
+      justCreated.value = true
       ready.value = true
     } catch (e: any) {
       error.value = e?.message ?? 'Failed to create household'
@@ -122,6 +124,7 @@ export const useHouseholdStore = defineStore('household', () => {
     inviteCode,
     ready,
     needsHousehold,
+    justCreated,
     loading,
     error,
     init,
