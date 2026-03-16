@@ -16,13 +16,6 @@
         placeholder="Add a meal..."
         class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
-      <input
-        v-model="date"
-        type="date"
-        :min="mealsStore.selectedRange.start"
-        :max="mealsStore.selectedRange.end"
-        class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
       <p v-if="validationError" class="text-red-500 text-xs">{{ validationError }}</p>
       <button
         type="submit"
@@ -36,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useMealsStore } from '@/stores/meals'
 import { useHouseholdStore } from '@/stores/household'
 import MealCard from '@/components/MealCard.vue'
@@ -45,15 +38,8 @@ const mealsStore = useMealsStore()
 const householdStore = useHouseholdStore()
 
 const title = ref('')
-const date = ref(mealsStore.selectedRange.start ?? '')
 const validationError = ref('')
 const isLoading = ref(false)
-
-// Keep default date in sync when the range changes
-watch(
-  () => mealsStore.selectedRange.start,
-  (start) => { if (start) date.value = start },
-)
 
 const sortedMeals = computed(() =>
   [...mealsStore.meals].sort((a, b) => a.date.localeCompare(b.date) || a.sort_order - b.sort_order)
@@ -65,14 +51,10 @@ async function handleSubmit() {
     validationError.value = 'Title is required'
     return
   }
-  if (!date.value) {
-    validationError.value = 'Date is required'
-    return
-  }
   isLoading.value = true
   try {
     await mealsStore.addMeal({
-      date: date.value,
+      date: mealsStore.selectedRange.start,
       title: title.value.trim(),
       meal_type: null,
       household_id: householdStore.householdId!,
