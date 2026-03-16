@@ -31,11 +31,13 @@ import { ref } from 'vue'
 import type { MealType } from '@/types/database'
 import { useMealsStore } from '@/stores/meals'
 import { useHouseholdStore } from '@/stores/household'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{ date: string }>()
 
 const mealsStore = useMealsStore()
 const householdStore = useHouseholdStore()
+const authStore = useAuthStore()
 
 const title = ref('')
 const mealType = ref('')
@@ -59,7 +61,7 @@ async function handleSubmit() {
       household_id: householdStore.householdId!,
       notes: null,
       sort_order: 0,
-      created_by: '',
+      created_by: authStore.user!.id,
     })
     title.value = ''
     mealType.value = ''

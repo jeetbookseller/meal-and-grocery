@@ -72,6 +72,9 @@
       <div v-if="items.length === 0" class="px-4 py-3 text-sm text-gray-400 italic">
         No items in this section
       </div>
+      <div class="px-4 py-3">
+        <AddItemInline :section-id="section.id" :household-id="householdStore.householdId!" />
+      </div>
     </div>
   </div>
 </template>
@@ -79,8 +82,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useGroceryStore } from '@/stores/grocery'
+import { useHouseholdStore } from '@/stores/household'
 import type { GrocerySection, GroceryItem as GroceryItemType } from '@/types/database'
 import GroceryItem from '@/components/GroceryItem.vue'
+import AddItemInline from '@/components/grocery/AddItemInline.vue'
 
 const props = defineProps<{
   section: GrocerySection
@@ -88,6 +93,7 @@ const props = defineProps<{
 }>()
 
 const groceryStore = useGroceryStore()
+const householdStore = useHouseholdStore()
 const isExpanded = ref(true)
 const isRenaming = ref(false)
 const renameValue = ref(props.section.name)
