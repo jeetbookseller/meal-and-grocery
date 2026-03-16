@@ -1,6 +1,13 @@
 <template>
-  <div data-testid="grocery-item" class="flex items-center gap-2 py-2 px-1">
-    <label class="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer">
+  <div
+    data-testid="grocery-item"
+    class="flex items-center gap-2 py-2 px-1 cursor-pointer hover:bg-gray-50"
+    @click="$emit('edit', item)"
+  >
+    <label
+      class="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
+      @click.stop
+    >
       <input
         type="checkbox"
         :checked="item.is_checked"
@@ -26,15 +33,6 @@
         </span>
       </div>
     </div>
-    <button
-      data-testid="edit-item-btn"
-      class="p-1 text-gray-400 hover:text-gray-600 rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
-      @click="$emit('edit', item)"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-      </svg>
-    </button>
   </div>
 </template>
 
