@@ -11,6 +11,6 @@ app.use(router)
 
 import { useAuthStore } from './stores/auth'
 const authStore = useAuthStore()
-authStore.init().then(() => {
+authStore.init().catch(console.error).finally(() => {
   app.mount('#app')
 })
