@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, RouterLinkStub, flushPromises } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
 const mockGetUser = vi.fn()
@@ -22,6 +23,19 @@ vi.mock('vue-router', async (importOriginal) => {
   }
 })
 
+const mockHouseholdStore = {
+  ready: true,
+  inviteCode: 'abc12345',
+}
+
+vi.mock('@/stores/household', () => ({
+  useHouseholdStore: () => mockHouseholdStore,
+}))
+
+vi.mock('@/components/InviteCodeModal.vue', () => ({
+  default: { template: '<div data-testid="invite-modal" />' },
+}))
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const mountComponent = async () => {
   const { default: TopNav } = await import('@/components/TopNav.vue')
@@ -35,9 +49,12 @@ const mountComponent = async () => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 describe('TopNav', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     mockGetUser.mockResolvedValue({ data: { user: { email: 'test@example.com' } } })
     mockSignOut.mockResolvedValue({})
+    mockHouseholdStore.ready = true
+    mockHouseholdStore.inviteCode = 'abc12345'
   })
 
   it('hides the user email on mobile (hidden class)', async () => {
@@ -81,5 +98,29 @@ describe('TopNav', () => {
     const wrapper = await mountComponent()
     await wrapper.find('[data-testid="logout-btn"]').trigger('click')
     expect(mockSignOut).toHaveBeenCalled()
+  })
+
+  it('shows invite button when household is ready', async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find('[data-testid="invite-btn"]').exists()).toBe(true)
+  })
+
+  it('hides invite button when household is not ready', async () => {
+    mockHouseholdStore.ready = false
+    const wrapper = await mountComponent()
+    expect(wrapper.find('[data-testid="invite-btn"]').exists()).toBe(false)
+  })
+
+  it('invite button meets 44px touch target', async () => {
+    const wrapper = await mountComponent()
+    const btn = wrapper.find('[data-testid="invite-btn"]')
+    expect(btn.classes()).toContain('min-h-[44px]')
+  })
+
+  it('opens InviteCodeModal when invite button is clicked', async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find('[data-testid="invite-modal"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="invite-btn"]').trigger('click')
+    expect(wrapper.find('[data-testid="invite-modal"]').exists()).toBe(true)
   })
 })

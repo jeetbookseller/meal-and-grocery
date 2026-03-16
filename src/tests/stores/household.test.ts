@@ -77,6 +77,7 @@ describe('useHouseholdStore', () => {
       expect(store.needsHousehold).toBe(false)
       expect(store.householdId).toBe('household-1')
       expect(store.householdName).toBe('Our Home')
+      expect(store.inviteCode).toBe('abc12345')
     })
 
     it('sets error string when getUser fails', async () => {
@@ -206,6 +207,50 @@ describe('useHouseholdStore', () => {
 
       const store = useHouseholdStore()
       await store.joinHousehold('abc12345')
+
+      expect(store.loading).toBe(false)
+    })
+  })
+
+  describe('regenerateInviteCode()', () => {
+    it('calls regenerate_invite_code RPC with householdId and updates inviteCode', async () => {
+      mockRpc.mockResolvedValueOnce({ data: 'newcode1', error: null })
+
+      const store = useHouseholdStore()
+      store.householdId = 'household-1'
+      store.inviteCode = 'abc12345'
+      await store.regenerateInviteCode()
+
+      expect(mockRpc).toHaveBeenCalledWith('regenerate_invite_code', { p_household_id: 'household-1' })
+      expect(store.inviteCode).toBe('newcode1')
+      expect(store.error).toBeNull()
+    })
+
+    it('sets error string on RPC failure', async () => {
+      mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'Not authorized' } })
+
+      const store = useHouseholdStore()
+      store.householdId = 'household-1'
+      store.inviteCode = 'abc12345'
+      await store.regenerateInviteCode()
+
+      expect(store.error).toBe('Not authorized')
+      expect(store.inviteCode).toBe('abc12345')
+    })
+
+    it('does nothing when householdId is null', async () => {
+      const store = useHouseholdStore()
+      await store.regenerateInviteCode()
+
+      expect(mockRpc).not.toHaveBeenCalled()
+    })
+
+    it('sets loading=false after completion', async () => {
+      mockRpc.mockResolvedValueOnce({ data: 'newcode1', error: null })
+
+      const store = useHouseholdStore()
+      store.householdId = 'household-1'
+      await store.regenerateInviteCode()
 
       expect(store.loading).toBe(false)
     })

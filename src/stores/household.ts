@@ -30,7 +30,7 @@ export const useHouseholdStore = defineStore('household', () => {
       if (membership) {
         const { data: household, error: householdError } = await supabase
           .from('households')
-          .select('id, name')
+          .select('id, name, invite_code')
           .eq('id', membership.household_id)
           .single()
 
@@ -38,6 +38,7 @@ export const useHouseholdStore = defineStore('household', () => {
 
         householdId.value = household.id
         householdName.value = household.name
+        inviteCode.value = household.invite_code
         ready.value = true
       } else {
         needsHousehold.value = true
@@ -94,6 +95,27 @@ export const useHouseholdStore = defineStore('household', () => {
     }
   }
 
+  async function regenerateInviteCode() {
+    if (!householdId.value) return
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc('regenerate_invite_code', {
+        p_household_id: householdId.value,
+      })
+
+      if (rpcError) throw rpcError
+
+      inviteCode.value = data
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to regenerate invite code'
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     householdId,
     householdName,
@@ -105,5 +127,6 @@ export const useHouseholdStore = defineStore('household', () => {
     init,
     createHousehold,
     joinHousehold,
+    regenerateInviteCode,
   }
 })

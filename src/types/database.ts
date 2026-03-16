@@ -97,6 +97,10 @@ export interface Database {
         Args: { p_invite_code: string }
         Returns: { id: string; name: string }
       }
+      regenerate_invite_code: {
+        Args: { p_household_id: string }
+        Returns: string
+      }
     }
   }
 }
