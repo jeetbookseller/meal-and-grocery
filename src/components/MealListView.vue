@@ -32,10 +32,12 @@
 import { ref, computed } from 'vue'
 import { useMealsStore } from '@/stores/meals'
 import { useHouseholdStore } from '@/stores/household'
+import { useAuthStore } from '@/stores/auth'
 import MealCard from '@/components/MealCard.vue'
 
 const mealsStore = useMealsStore()
 const householdStore = useHouseholdStore()
+const authStore = useAuthStore()
 
 const title = ref('')
 const validationError = ref('')
@@ -60,7 +62,7 @@ async function handleSubmit() {
       household_id: householdStore.householdId!,
       notes: null,
       sort_order: 0,
-      created_by: '',
+      created_by: authStore.user!.id,
     })
     title.value = ''
   } finally {
