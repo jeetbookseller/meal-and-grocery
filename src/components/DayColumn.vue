@@ -1,13 +1,18 @@
 <template>
-  <div class="day-column bg-white rounded-lg shadow p-3 min-w-[160px]">
-    <h3 class="font-semibold text-sm text-gray-600 mb-2">{{ formattedDate }}</h3>
-    <p v-if="meals.length === 0" class="text-xs text-gray-400 italic">No meals planned — add one below</p>
+  <div class="min-w-48 flex-shrink-0">
+    <h3 data-testid="day-heading" class="font-semibold text-sm mb-2 text-gray-700">
+      {{ formattedDate }}
+    </h3>
+    <MealCard v-for="meal in meals" :key="meal.id" :meal="meal" />
+    <AddMealInline :date="date" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Meal } from '@/types/database'
+import MealCard from '@/components/MealCard.vue'
+import AddMealInline from '@/components/AddMealInline.vue'
 
 const props = defineProps<{
   date: string
@@ -15,7 +20,11 @@ const props = defineProps<{
 }>()
 
 const formattedDate = computed(() => {
-  const d = new Date(props.date + 'T00:00:00')
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  // Use noon local time to avoid UTC-shift issues with date-only strings
+  const d = new Date(props.date + 'T12:00:00')
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'short' })
+  const month = d.toLocaleDateString('en-US', { month: 'short' })
+  const day = d.getDate()
+  return `${weekday} ${month} ${day}`
 })
 </script>
