@@ -254,7 +254,8 @@ export const useGroceryStore = defineStore('grocery', () => {
         { event: '*', schema: 'public', table: 'grocery_sections', filter: `household_id=eq.${householdId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            sections.value.push(payload.new as GrocerySection)
+            const exists = sections.value.some(s => s.id === (payload.new as GrocerySection).id)
+            if (!exists) sections.value.push(payload.new as GrocerySection)
           } else if (payload.eventType === 'UPDATE') {
             const idx = sections.value.findIndex(s => s.id === (payload.new as GrocerySection).id)
             if (idx !== -1) sections.value[idx] = payload.new as GrocerySection
@@ -273,7 +274,8 @@ export const useGroceryStore = defineStore('grocery', () => {
         { event: '*', schema: 'public', table: 'grocery_items', filter: `household_id=eq.${householdId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            items.value.push(payload.new as GroceryItem)
+            const exists = items.value.some(i => i.id === (payload.new as GroceryItem).id)
+            if (!exists) items.value.push(payload.new as GroceryItem)
           } else if (payload.eventType === 'UPDATE') {
             const idx = items.value.findIndex(i => i.id === (payload.new as GroceryItem).id)
             if (idx !== -1) items.value[idx] = payload.new as GroceryItem
