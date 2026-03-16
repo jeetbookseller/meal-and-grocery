@@ -22,6 +22,22 @@ export const useGroceryStore = defineStore('grocery', () => {
     return map
   })
 
+  const ungroupedSection = computed(() =>
+    sections.value.find(s => s.name === 'Ungrouped') ?? null
+  )
+
+  async function ensureUngroupedSection() {
+    const householdId = useHouseholdStore().householdId
+    if (!householdId) return
+    if (sections.value.some(s => s.name === 'Ungrouped')) return
+    const { data, error: insertError } = await supabase
+      .from('grocery_sections')
+      .insert({ household_id: householdId, name: 'Ungrouped', sort_order: -1, is_default: false })
+      .select()
+      .single()
+    if (!insertError && data) sections.value.unshift(data)
+  }
+
   async function fetchSections() {
     const householdId = useHouseholdStore().householdId
     if (!householdId) return
@@ -287,6 +303,8 @@ export const useGroceryStore = defineStore('grocery', () => {
     loading,
     error,
     itemsBySection,
+    ungroupedSection,
+    ensureUngroupedSection,
     fetchSections,
     fetchItems,
     addSection,
