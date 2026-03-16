@@ -234,11 +234,20 @@ Both tasks are independent and can be built in parallel.
 
 The MVP is feature-complete. Before starting Group 5, do the following:
 
-1. **End-to-end smoke test** — log in as both users, create a household, add meals for the week, build a grocery list, link items to meals, check items off. Verify Realtime sync works across two browser tabs.
-2. **Fix any critical bugs** found during the smoke test before moving on.
-3. **Confirm GitHub Pages deployment** is live and accessible at the expected URL with correct hash routing.
-4. **Review PWA install prompt** on mobile (iOS Safari + Android Chrome) — ensure the manifest and service worker are registered correctly.
-5. **Accessibility pass** — keyboard navigation through all interactive elements, screen reader labels on icon-only buttons.
+### Supabase Setup (required before the app works)
+
+1. **Create a Supabase project** at supabase.com (free tier is sufficient for two users)
+2. **Apply the migration** — run `supabase/migrations/001_initial_schema.sql` via the Supabase SQL editor or `supabase db push` with the CLI
+3. **Configure local credentials** — copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from your project's **Settings → API** page
+4. **Add GitHub repository secrets** — add the same two env vars as secrets in GitHub repo settings so the CI deploy workflow can build correctly
+
+### Verification & QA
+
+5. **End-to-end smoke test** — log in as both users, create a household, add meals for the week, build a grocery list, link items to meals, check items off. Verify Realtime sync works across two browser tabs.
+6. **Fix any critical bugs** found during the smoke test before moving on.
+7. **Confirm GitHub Pages deployment** is live and accessible at the expected URL with correct hash routing.
+8. **Review PWA install prompt** on mobile (iOS Safari + Android Chrome) — ensure the manifest and service worker are registered correctly.
+9. **Accessibility pass** — keyboard navigation through all interactive elements, screen reader labels on icon-only buttons.
 
 ---
 
