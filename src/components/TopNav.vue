@@ -1,4 +1,6 @@
 <template>
+  <div>
+  <OfflineIndicator />
   <nav class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
     <div class="flex gap-1">
       <RouterLink
@@ -26,12 +28,14 @@
       </button>
     </div>
   </nav>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
+import OfflineIndicator from '@/components/OfflineIndicator.vue'
 
 const router = useRouter()
 const userEmail = ref<string | null>(null)
