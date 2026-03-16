@@ -93,4 +93,19 @@ describe('GroceryItem.vue', () => {
     await wrapper.find('[data-testid="edit-item-btn"]').trigger('click')
     expect(wrapper.emitted('edit')).toBeTruthy()
   })
+
+  // ─── Mobile responsiveness: touch targets ───────────────────────────────────
+  it('checkbox is wrapped in a label with 44px touch target', () => {
+    const wrapper = mount(GroceryItem, { props: { item: baseItem } })
+    const label = wrapper.find('label')
+    expect(label.exists()).toBe(true)
+    expect(label.classes()).toContain('min-w-[44px]')
+    expect(label.classes()).toContain('min-h-[44px]')
+  })
+
+  it('checkbox is inside the label element', () => {
+    const wrapper = mount(GroceryItem, { props: { item: baseItem } })
+    const label = wrapper.find('label')
+    expect(label.find('input[type="checkbox"]').exists()).toBe(true)
+  })
 })
