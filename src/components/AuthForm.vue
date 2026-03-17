@@ -1,11 +1,11 @@
 <template>
   <form @submit.prevent="handleSubmit" class="space-y-4">
-    <div v-if="authStore.error" class="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">
+    <div v-if="authStore.error" data-testid="auth-error" class="p-3 rounded-md bg-red-50 border border-danger/30 text-danger text-sm">
       {{ authStore.error }}
     </div>
 
     <div>
-      <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <label for="email" class="block text-sm font-medium text-text-primary mb-1">Email</label>
       <input
         id="email"
         v-model="email"
@@ -13,12 +13,12 @@
         required
         autocomplete="email"
         placeholder="you@example.com"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        class="input"
       />
     </div>
 
     <div>
-      <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+      <label for="password" class="block text-sm font-medium text-text-primary mb-1">Password</label>
       <input
         id="password"
         v-model="password"
@@ -26,14 +26,14 @@
         required
         autocomplete="current-password"
         placeholder="••••••••"
-        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        class="input"
       />
     </div>
 
     <button
       type="submit"
       :disabled="authStore.loading"
-      class="w-full flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-md transition-colors"
+      class="btn-primary w-full gap-2"
     >
       <svg v-if="authStore.loading" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -42,14 +42,14 @@
       {{ mode === 'login' ? 'Sign in' : 'Create account' }}
     </button>
 
-    <p class="text-center text-sm text-gray-500">
+    <p class="text-center text-sm text-text-secondary">
       <template v-if="mode === 'login'">
         Don't have an account?
-        <button type="button" @click="switchMode" class="text-blue-600 hover:underline font-medium">Sign up</button>
+        <button type="button" @click="switchMode" class="text-accent hover:underline font-medium">Sign up</button>
       </template>
       <template v-else>
         Already have an account?
-        <button type="button" @click="switchMode" class="text-blue-600 hover:underline font-medium">Sign in</button>
+        <button type="button" @click="switchMode" class="text-accent hover:underline font-medium">Sign in</button>
       </template>
     </p>
   </form>

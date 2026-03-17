@@ -1,33 +1,33 @@
 <template>
   <div>
     <OfflineIndicator />
-    <nav class="bg-white border-b border-gray-200 px-4 flex items-center justify-between">
-      <div class="flex gap-1">
+    <nav class="bg-surface border-b border-border px-4 flex items-center justify-between h-14">
+      <div class="flex gap-1 overflow-x-auto">
         <RouterLink
           to="/app/meals"
-          class="px-3 min-h-[44px] flex items-center rounded-md text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          active-class="text-blue-600 bg-blue-50"
+          class="px-3 min-h-[44px] flex items-center rounded-md text-sm font-medium text-text-secondary hover:text-accent hover:bg-hover-bg transition-colors duration-150 whitespace-nowrap"
+          active-class="nav-tab-active"
         >
           Meals
         </RouterLink>
         <RouterLink
           to="/app/groceries"
-          class="px-3 min-h-[44px] flex items-center rounded-md text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-          active-class="text-blue-600 bg-blue-50"
+          class="px-3 min-h-[44px] flex items-center rounded-md text-sm font-medium text-text-secondary hover:text-accent hover:bg-hover-bg transition-colors duration-150 whitespace-nowrap"
+          active-class="nav-tab-active"
         >
           Groceries
         </RouterLink>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-1 shrink-0">
         <span
           v-if="userEmail"
           data-testid="user-email"
-          class="hidden sm:inline text-sm text-gray-500 px-2"
+          class="hidden sm:inline text-sm text-text-secondary px-2"
         >{{ userEmail }}</span>
         <button
           v-if="householdStore.ready"
           data-testid="invite-btn"
-          class="min-h-[44px] flex items-center px-2 text-sm text-gray-600 hover:text-blue-600 transition-colors"
+          class="min-h-[44px] min-w-[44px] flex items-center justify-center px-2 text-text-secondary hover:text-accent transition-colors duration-150"
           title="Invite to household"
           @click="showInviteModal = true"
         >
@@ -38,7 +38,7 @@
         <button
           data-testid="logout-btn"
           @click="logout"
-          class="min-h-[44px] flex items-center px-2 text-sm text-gray-600 hover:text-red-600 transition-colors"
+          class="min-h-[44px] flex items-center px-2 text-sm text-text-secondary hover:text-danger transition-colors duration-150"
         >
           Logout
         </button>
