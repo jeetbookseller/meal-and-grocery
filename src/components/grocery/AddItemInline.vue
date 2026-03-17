@@ -6,7 +6,7 @@
         data-testid="name-input"
         type="text"
         placeholder="Item name"
-        class="flex-1 border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="input flex-1"
         :disabled="loading"
       />
       <input
@@ -14,7 +14,7 @@
         data-testid="quantity-input"
         type="text"
         placeholder="Qty"
-        class="w-20 border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="input w-20"
         :disabled="loading"
       />
     </div>
@@ -23,7 +23,8 @@
       <button
         type="button"
         data-testid="link-meals-btn"
-        class="text-sm text-blue-600 hover:underline disabled:opacity-50"
+        class="text-sm disabled:opacity-50"
+        style="color: var(--color-accent)"
         :disabled="loading"
         @click="showMealPicker = true"
       >
@@ -31,12 +32,12 @@
       </button>
     </div>
 
-    <p v-if="error" data-testid="error-msg" class="text-red-600 text-sm">{{ error }}</p>
+    <p v-if="error" data-testid="error-msg" class="text-sm" style="color: var(--color-danger)">{{ error }}</p>
 
     <button
       type="submit"
       data-testid="submit-btn"
-      class="bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50"
+      class="btn-primary"
       :disabled="loading || !name.trim()"
     >
       {{ loading ? 'Saving...' : isEditMode ? 'Save' : 'Add Item' }}

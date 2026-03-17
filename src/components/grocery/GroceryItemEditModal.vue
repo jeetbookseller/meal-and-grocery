@@ -1,44 +1,44 @@
 <template>
   <!-- Backdrop -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
     @click.self="$emit('close')"
   >
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-      <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit Item</h3>
+    <div class="modal-panel max-w-md p-6">
+      <h3 class="text-lg font-semibold mb-4" style="color: var(--color-text-primary)">Edit Item</h3>
 
       <form @submit.prevent="handleSave">
         <div class="flex flex-col gap-3">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-secondary)">Name</label>
             <input
               v-model="name"
               data-testid="edit-name-input"
               type="text"
-              class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              class="input"
               :disabled="loading"
               required
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-secondary)">Quantity</label>
             <input
               v-model="quantity"
               data-testid="edit-quantity-input"
               type="text"
               placeholder="e.g. 2 lbs"
-              class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              class="input"
               :disabled="loading"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Section</label>
+            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-secondary)">Section</label>
             <select
               v-model="sectionId"
               data-testid="edit-section-select"
-              class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              class="input"
               :disabled="loading"
             >
               <option v-for="section in groceryStore.sections" :key="section.id" :value="section.id">
@@ -47,14 +47,15 @@
             </select>
           </div>
 
-          <p v-if="error" class="text-red-600 text-sm">{{ error }}</p>
+          <p v-if="error" class="text-sm" style="color: var(--color-danger)">{{ error }}</p>
         </div>
 
         <div class="flex justify-between items-center mt-6">
           <button
             type="button"
             data-testid="delete-item-btn"
-            class="px-4 py-2 text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
+            class="px-4 min-h-[44px] text-sm disabled:opacity-50"
+            style="color: var(--color-danger)"
             :disabled="loading"
             @click="handleDelete"
           >
@@ -63,7 +64,7 @@
           <div class="flex gap-2">
             <button
               type="button"
-              class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50"
+              class="btn-ghost"
               :disabled="loading"
               @click="$emit('close')"
             >
@@ -72,7 +73,7 @@
             <button
               type="submit"
               data-testid="save-item-btn"
-              class="px-4 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+              class="btn-primary min-h-[44px]"
               :disabled="loading || !name.trim()"
             >
               {{ loading ? 'Saving...' : 'Save' }}

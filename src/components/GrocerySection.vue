@@ -53,11 +53,11 @@
             data-testid="rename-input"
             v-model="renameValue"
             type="text"
-            class="flex-1 text-sm border border-gray-300 rounded px-2 py-1"
+            class="input flex-1 text-sm"
             @keydown.escape="isRenaming = false"
           />
-          <button type="submit" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">Save</button>
-          <button type="button" class="px-2 py-1 text-xs text-gray-600 rounded hover:bg-gray-100" @click="isRenaming = false">Cancel</button>
+          <button type="submit" class="btn-primary text-xs px-3">Save</button>
+          <button type="button" class="btn-ghost text-xs px-3" @click="isRenaming = false">Cancel</button>
         </form>
       </template>
     </div>

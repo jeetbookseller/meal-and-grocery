@@ -1,7 +1,8 @@
 <template>
   <button
     data-testid="clear-checked-btn"
-    class="flex items-center gap-1 px-3 py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+    class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg transition-colors duration-150"
+    style="color: var(--color-danger)"
     @click="groceryStore.clearChecked()"
   >
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

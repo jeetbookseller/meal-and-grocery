@@ -1,10 +1,10 @@
 <template>
   <div
-    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm"
     data-testid="backdrop"
     @click.self="$emit('close')"
   >
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col">
+    <div class="modal-panel max-w-md max-h-[80vh] flex flex-col">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 border-b">
         <h2 class="text-lg font-semibold">Link to Meals</h2>
@@ -56,7 +56,7 @@
       <div class="p-4 border-t">
         <button
           data-testid="done-btn"
-          class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700"
+          class="btn-primary w-full"
           @click="$emit('close')"
         >
           Done
