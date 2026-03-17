@@ -9,13 +9,13 @@
         data-testid="global-add-input"
         type="text"
         placeholder="Add to list..."
-        class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        class="input flex-1"
         :disabled="addingItem || !groceryStore.ungroupedSection"
       />
       <button
         type="submit"
         data-testid="global-add-btn"
-        class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        class="btn-primary"
         :disabled="addingItem || !newItemName.trim() || !groceryStore.ungroupedSection"
       >
         {{ addingItem ? 'Adding...' : 'Add' }}
@@ -109,9 +109,8 @@ async function handleAddItem() {
   }
 }
 
-onMounted(async () => {
-  await groceryStore.fetchSections()
-  await groceryStore.ensureUngroupedSection()
+onMounted(() => {
+  groceryStore.fetchSections().then(() => groceryStore.ensureUngroupedSection())
   groceryStore.fetchItems()
   groceryStore.subscribeRealtime()
 })

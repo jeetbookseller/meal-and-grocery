@@ -3,7 +3,8 @@
     <template v-if="!isAdding">
       <button
         data-testid="add-section-btn"
-        class="flex items-center gap-1 px-3 py-2 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg"
+        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg transition-colors duration-150"
+        style="color: var(--color-accent)"
         @click="isAdding = true"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -18,19 +19,19 @@
           v-model="name"
           type="text"
           placeholder="Section name"
-          class="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          class="input flex-1 text-sm"
           @keydown.escape="isAdding = false"
         />
         <button
           type="submit"
           data-testid="add-section-btn"
-          class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          class="btn-primary text-sm px-3"
         >
           Add
         </button>
         <button
           type="button"
-          class="px-2 py-1 text-sm text-gray-600 rounded hover:bg-gray-100"
+          class="btn-ghost text-sm px-3"
           @click="isAdding = false"
         >
           Cancel
