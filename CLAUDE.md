@@ -194,7 +194,7 @@ All four tasks are independent and can be built in parallel.
 
 ---
 
-### Group 5 — Polish & Onboarding *(after Group 4, MVP must be stable first)*
+### Group 5 — Polish & Onboarding ✅ COMPLETE
 
 Both tasks are independent and can be built in parallel.
 
@@ -203,7 +203,7 @@ Both tasks are independent and can be built in parallel.
 - After household creation, display the invite code to the first user
 - Second user: on first login with no household, show "Join existing household" option with a code input field → `householdStore.joinHousehold(code)`
 
-#### TASK-17: Design modernization
+#### TASK-17: Design modernization ✅ COMPLETE
 
 Design inspiration: **Notion** (off-white surfaces, bottom-border tab indicator, minimal depth) + **Anylist** (clean grocery rows, subtle separators, practical spacing). Light-only; no dark mode.
 
@@ -357,8 +357,8 @@ Group 3 (all 5 in parallel):       TASK-07, TASK-08, TASK-09, TASK-10, TASK-11  
   ↓
 Group 4 (all 4 in parallel):       TASK-12, TASK-13, TASK-14, TASK-15  ✅
   ↓
-Group 5:                            TASK-16 (independent)
-                                    TASK-17 (3 internal phases — see below)
+Group 5:                            TASK-16 (independent)  ✅
+                                    TASK-17 (3 internal phases — see below)  ✅
   ↓
 Group 6 (both in parallel):        TASK-18, TASK-19
 
