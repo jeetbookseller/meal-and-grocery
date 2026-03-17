@@ -2,13 +2,11 @@
 
 A shared meal planning and grocery list web app for two users (Jeet + partner). Built with Vue 3 + TypeScript + Supabase, deployed to GitHub Pages.
 
-See `meal-planner-plan.md` for the full product spec, data model, and UI details.
-
 ---
 
 ## Tech Stack
 
-- **Frontend**: Vue 3 + TypeScript, Vite, Tailwind CSS, Pinia
+- **Frontend**: Vue 3 + TypeScript, Vite, Tailwind CSS v4, Pinia
 - **Backend**: Supabase (Postgres + Auth + Realtime)
 - **Deploy**: GitHub Pages (hash router — no 404 redirect hack needed)
 - **Auth**: Supabase email/password, two accounts sharing one household
@@ -26,7 +24,64 @@ For every task: **plan → tests → implement → document**
 
 ---
 
-## Component Tree
+## Current Architecture (Groups 0–5 — COMPLETE)
+
+All foundational work is done: Supabase schema + RLS, Vue scaffold, auth, household management, meal & grocery stores with realtime sync, full UI with design tokens, PWA, GitHub Pages deploy, invite system, and design modernization.
+
+Key files from the existing implementation:
+- `supabase/migrations/001_initial_schema.sql` — Schema + RLS policies
+- `src/lib/supabase.ts` — Typed Supabase client
+- `src/stores/auth.ts` — Session, login/signup/logout
+- `src/stores/household.ts` — Household creation/join, `householdId` scoping
+- `src/stores/meals.ts` — Meal CRUD + realtime
+- `src/stores/grocery.ts` — Section/item CRUD + realtime
+- `src/style.css` — Design tokens via `@theme {}` + component classes
+
+---
+
+## App Redesign Plan (Group 7)
+
+### Design Philosophy
+
+**Anylist-style flat lists** with **Notion-style aesthetics** (current color tokens). Both meals and groceries become simple, flat, checkable lists. No date grouping, no meal types, no grocery sections. Tight layout maximizing screen real estate.
+
+### What Changes
+
+| Area | Current | New |
+|------|---------|-----|
+| Meals UI | Week/day timeline with DayColumn grid, meal_type badges | Single flat list with checkmarks, add input at top |
+| Groceries UI | Grouped by collapsible sections (Dairy, Produce, etc.) | Single flat list with checkmarks, add input at top |
+| Meal fields | title, date, meal_type, notes, sort_order | title, is_checked, sort_order (date/meal_type/notes unused) |
+| Grocery fields | name, quantity, section_id, is_checked, sort_order | name, quantity, is_checked, sort_order (section_id kept for DB but hidden) |
+| Cross-linking | Meal ↔ Grocery item linking | **Kept as-is** |
+| Auth/sharing | Email/password, invite codes, household | **Kept as-is** |
+| Edit/delete | Modal-based editing | **Kept** — simplified modals (fewer fields) |
+
+### What Gets Removed
+
+**Components to delete:**
+- `TimelineSelector.vue` — no more week/date selection
+- `DayColumn.vue` — no more day columns
+- `AddMealInline.vue` — replaced by top-of-list input in MealPlanView
+- `GrocerySection.vue` — no more category sections
+- `AddSectionButton.vue` — no more section management
+- `grocery/AddItemInline.vue` — replaced by top-of-list input in GroceryListView
+
+**Store simplifications:**
+- `meals.ts`: remove `selectedRange`, `mealsByDate` computed, `setRange()`. `fetchMeals()` fetches ALL meals for household (no date filter). Add `toggleChecked(id)` and `clearChecked()`.
+- `grocery.ts`: remove section CRUD methods (`addSection`, `renameSection`, `deleteSection`, `reorderSections`), `itemsBySection` computed. Keep a single auto-created section internally for DB FK. `fetchItems()` already works. Remove `fetchSections()` from public API (keep internal for FK).
+
+**Design token removals from `style.css`:**
+- Remove `badge-breakfast`, `badge-lunch`, `badge-dinner` classes
+- Remove `--color-breakfast-*`, `--color-lunch-*`, `--color-dinner-*` tokens
+
+**Test files to delete/rewrite:**
+- Delete tests for removed components: `TimelineSelector.test.ts`, `DayColumn.test.ts`, `AddMealInline.test.ts`, `GrocerySection.test.ts`, `AddSectionButton.test.ts`
+- Rewrite: `MealCard.test.ts`, `MealPlanView.test.ts`, `GroceryListView.test.ts`, `MealEditModal.test.ts`, `meals.test.ts`, `grocery.test.ts`
+
+---
+
+### New Component Tree
 
 ```
 App.vue
@@ -36,182 +91,205 @@ App.vue
     └── AppLayout.vue
         ├── TopNav.vue                 (tabs + user avatar + logout)
         ├── MealPlanView.vue           (Tab 1: /app/meals)
-        │   ├── TimelineSelector.vue
-        │   ├── DayColumn.vue          (one per date in selected range)
-        │   │   ├── MealCard.vue
-        │   │   └── AddMealInline.vue
-        │   └── MealEditModal.vue
+        │   ├── MealRow.vue            (checkbox + title + edit/delete icons)
+        │   ├── MealEditModal.vue      (simplified: title only + linked groceries)
+        │   └── ClearCheckedButton.vue (shared)
         └── GroceryListView.vue        (Tab 2: /app/groceries)
-            ├── GrocerySection.vue     (collapsible)
-            │   ├── SectionHeader.vue
-            │   ├── GroceryItem.vue
-            │   └── AddItemInline.vue
-            ├── AddSectionButton.vue
-            ├── ClearCheckedButton.vue
-            └── MealLinkPicker.vue     (modal, reused in add + edit)
+            ├── GroceryItem.vue        (checkbox + name + qty + edit/delete icons)
+            ├── GroceryItemEditModal.vue (name, qty, linked meals)
+            ├── MealLinkPicker.vue     (modal, reused)
+            └── ClearCheckedButton.vue (shared)
 ```
 
----
-
-## Pinia Store Structure
+### New Pinia Store Structure
 
 ```
 src/stores/
-├── auth.ts       — session, user, login(), signup(), logout()
-├── household.ts  — householdId, householdName, ready flag, ensureHousehold()
-├── meals.ts      — meals[], selectedRange, CRUD, mealsByDate getter, Realtime
-└── grocery.ts    — sections[], items[], CRUD, itemsBySection getter, Realtime
+├── auth.ts       — session, user, login(), signup(), logout()  [unchanged]
+├── household.ts  — householdId, householdName, ready flag      [unchanged]
+├── meals.ts      — meals[], fetchMeals(), addMeal(), updateMeal(), deleteMeal(),
+│                   toggleChecked(), clearChecked(), Realtime
+└── grocery.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
+                    toggleChecked(), clearChecked(), linkItemToMeals(), Realtime
 ```
 
-Store dependency order: `auth` → `household` → `meals` + `grocery` (meals and grocery are independent once household is ready).
+---
+
+### Implementation Tasks
+
+#### TASK-20: Supabase migration — add `is_checked` to meals
+
+**File**: `supabase/migrations/002_meals_is_checked.sql`
+
+```sql
+ALTER TABLE meals ADD COLUMN is_checked boolean NOT NULL DEFAULT false;
+```
+
+- No RLS changes needed (existing policies cover all columns)
+- **Manual step**: Run this migration in the Supabase SQL editor before deploying the new frontend
 
 ---
 
-## Implementation Tasks
+#### TASK-21: Simplify meals store
 
-Tasks are grouped by dependency tier. All tasks within a group can be worked in parallel.
+**File**: `src/stores/meals.ts`
 
----
+- Remove `selectedRange` state, `mealsByDate` computed, `setRange()` method
+- `fetchMeals()` → query all meals for `household_id`, ordered by `sort_order`
+- Add `toggleChecked(id)` — same pattern as grocery store
+- Add `clearChecked()` — delete all checked meals from DB
+- `addMeal(payload)` — simplified payload: `{ title, household_id, sort_order }`
+- Keep realtime subscription as-is (already handles INSERT/UPDATE/DELETE)
+- Update `Meal` type in `database.ts`: add `is_checked: boolean`
 
-### Group 0 — Foundation ✅ COMPLETE
-
-Both tasks are independent and can be done in parallel.
-
-#### TASK-01: Supabase schema + RLS + seed function
-- Create all 6 tables (`households`, `household_members`, `meals`, `grocery_sections`, `grocery_items`, `grocery_item_meals`) with correct FKs and indexes
-- Index `meals(household_id, date)` and `grocery_items(household_id, section_id)`
-- Enable RLS on all tables. Policy pattern: `EXISTS (SELECT 1 FROM household_members WHERE household_id = <table>.household_id AND user_id = auth.uid())`
-- **Special case**: `grocery_item_meals` has no `household_id` — its RLS must join through `grocery_items → household_members`. Test this explicitly.
-- Write `seed_default_sections(p_household_id uuid)` Postgres function inserting 12 default sections (Produce, Dairy, Meat & Seafood, Frozen, Pantry/Dry Goods, Condiments & Sauces, Beverages, Bakery/Bread, Snacks, Home Cleaning, Personal Hygiene, Other)
-- Enable Realtime publication on `meals`, `grocery_items`, `grocery_sections`
-- **Deliverable**: `supabase/migrations/001_initial_schema.sql`
-
-#### TASK-02: Vue project scaffold + routing + Supabase client
-- `npm create vue@latest` (TypeScript, Pinia, Vue Router)
-- Install: `@supabase/supabase-js`, `tailwindcss`, `vite-plugin-pwa` (stub, activate in TASK-14)
-- `src/lib/supabase.ts` — typed Supabase client using `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`
-- `src/types/database.ts` — TypeScript row interfaces for all tables
-- Router: `/login` (public), `/app/meals` and `/app/groceries` (auth-guarded via navigation guard)
-- Use `createWebHashHistory` (hash URLs — avoids GitHub Pages 404 redirect hack)
-- Stub views: `LoginView`, `MealPlanView`, `GroceryListView`, `AppLayout`
-- **Deliverable**: project boots, router navigates between stubs
+**Tests**: Rewrite `src/tests/meals.test.ts` — remove date-range tests, add toggleChecked/clearChecked tests
 
 ---
 
-### Group 1 — Auth + Household ✅ COMPLETE
+#### TASK-22: Simplify grocery store
 
-#### TASK-03: Auth store + LoginView
-- `stores/auth.ts`: call `supabase.auth.getSession()` on app init; subscribe to `onAuthStateChange` for the app lifetime; expose `login(email, password)`, `signup(email, password)`, `logout()`, `user`, `session`, `loading`
-- `LoginView.vue` + `AuthForm.vue`: email/password fields, toggle between login and signup modes, inline error display, loading spinner on submit
-- On success: `router.push('/app/meals')`
+**File**: `src/stores/grocery.ts`
 
-#### TASK-04: Household store + TopNav
-- `stores/household.ts`: on `init()`, query `household_members` for `auth.uid()`. If found, load household. If not, show create-household prompt (name input), then insert into `households` + `household_members`, then call `seed_default_sections`
-- Expose `householdId`, `householdName`, `ready` (boolean — true once household is resolved)
-- `AppLayout.vue`: call `householdStore.init()` on mount; render `<router-view>` only when `householdStore.ready === true` (prevents race conditions with data stores)
-- `TopNav.vue`: two tab links (`/app/meals`, `/app/groceries`), user email display, logout button
+- Remove `sections` from public state (keep internal for FK)
+- Remove `addSection`, `renameSection`, `deleteSection`, `reorderSections`, `itemsBySection`
+- Keep `ensureUngroupedSection()` as internal — auto-create a single section on init
+- `fetchItems()` — unchanged (already fetches all items for household)
+- `addItem(payload)` — auto-assign section_id to the ungrouped section internally
+- Keep `linkItemToMeals()`, `toggleChecked()`, `clearChecked()` as-is
+- Remove sections realtime channel (keep items channel only)
 
----
-
-### Group 2 — Data Stores ✅ COMPLETE
-
-Both stores are independent and can be built in parallel.
-
-#### TASK-05: Meals store (data layer only — no components)
-- State: `meals: Meal[]`, `selectedRange: { start: string; end: string }`, `loading: boolean`, `error: string | null`
-- `setRange(start, end)` — updates range and triggers `fetchMeals()`
-- `fetchMeals()` — query `meals` filtered by `household_id` and `date BETWEEN start AND end`, ordered by `date, sort_order`
-- `addMeal(payload)`, `updateMeal(id, payload)`, `deleteMeal(id)` — optimistic local update + Supabase call
-- `subscribeRealtime()` / `unsubscribeRealtime()` — Supabase channel on `meals` filtered by `household_id`; on INSERT/UPDATE upsert into `meals[]` by id; on DELETE splice out by id
-- Computed: `mealsByDate: Record<string, Meal[]>` (ISO date string → sorted meals array)
-
-#### TASK-06: Grocery store (data layer only — no components)
-- State: `sections: GrocerySection[]`, `items: GroceryItem[]`, `loading: boolean`, `error: string | null`
-- `fetchSections()`, `fetchItems()` — both scoped to `household_id`
-- Section CRUD: `addSection(name)`, `renameSection(id, name)`, `deleteSection(id)`, `reorderSections(orderedIds)`
-- Item CRUD: `addItem(payload)`, `updateItem(id, payload)`, `deleteItem(id)`, `toggleChecked(id)`, `clearChecked()`
-- `linkItemToMeals(itemId, mealIds)` — delete all rows in `grocery_item_meals` for this item, then insert the new set
-- `subscribeRealtime()` — two Supabase channels: one for `grocery_sections`, one for `grocery_items`, both filtered by `household_id`
-- Computed: `itemsBySection: Record<string, GroceryItem[]>`
+**Tests**: Rewrite `src/tests/grocery.test.ts` — remove section tests, simplify item tests
 
 ---
 
-### Group 3 — Core UI Components ✅ COMPLETE
+#### TASK-23: Redesign MealPlanView + MealRow
 
-All five tasks are independent and can be built in parallel.
+**Files**: `src/views/MealPlanView.vue`, `src/components/MealRow.vue` (new, replaces MealCard)
 
-#### TASK-07: TimelineSelector + MealPlanView skeleton
-- `TimelineSelector.vue`: three buttons — "This Week", "Next Week", "Custom Range". This/Next Week compute Mon–Sun ranges from today. Custom Range shows two `<input type="date">` fields. On selection, calls `mealsStore.setRange(start, end)`
-- `MealPlanView.vue`: on mount call `setRange` (default: this week) + `subscribeRealtime()`; on unmount call `unsubscribeRealtime()`; render one `DayColumn` per date in range using `mealsStore.mealsByDate`
-- Layout: mobile = horizontal scroll of day cards; desktop = 7-column CSS grid
+**MealPlanView.vue**:
+- Top: text input + "Add" button (same pattern as current GroceryListView global add)
+- Below: flat list of `MealRow` items, unchecked first then checked (dimmed)
+- Bottom: `ClearCheckedButton` to delete checked meals
+- Loading/error/empty states using BaseSpinner/BaseErrorBanner
+- On mount: `mealsStore.fetchMeals()` + `subscribeRealtime()`
 
-#### TASK-08: MealCard + DayColumn
-- `DayColumn.vue`: receives `date: string` and `meals: Meal[]` as props; shows date heading (e.g. "Mon Mar 16"); renders a `MealCard` per meal; renders `AddMealInline` at bottom
-- `MealCard.vue`: title, optional meal_type badge (breakfast=yellow, lunch=green, dinner=blue), collapsible notes, edit pencil icon (opens `MealEditModal`), delete trash icon (confirm then `mealsStore.deleteMeal`)
+**MealRow.vue** (replaces MealCard):
+- Checkbox (44px touch target) + meal title + edit pencil + delete trash
+- Checked items: strikethrough + muted text
+- Edit opens MealEditModal
+- Linked grocery count badge (small chip showing count of linked grocery items)
 
-#### TASK-09: AddMealInline + MealEditModal
-- `AddMealInline.vue`: title text input (required) + meal_type select (optional: —, breakfast, lunch, dinner); on submit calls `mealsStore.addMeal({ date, title, meal_type, household_id })`; shows inline validation and loading state
-- `MealEditModal.vue`: centered modal overlay (`fixed inset-0`); receives meal object as prop, emits `close`; fields: title, meal_type, notes textarea; on submit calls `mealsStore.updateMeal`
+**MealEditModal.vue** — simplify:
+- Remove meal_type select, date field, notes textarea
+- Keep: title input + linked grocery items picker
+- Add: GroceryLinkPicker (inverse of MealLinkPicker — select grocery items to link to this meal)
 
-#### TASK-10: GrocerySection + GroceryItem + GroceryListView skeleton
-- `GroceryListView.vue`: on mount fetch sections + items + `subscribeRealtime()`; on unmount unsubscribe; render one `GrocerySection` per section sorted by `sort_order`; render `AddSectionButton` and `ClearCheckedButton` at bottom
-- `GrocerySection.vue`: receives `section: GrocerySection` and `items: GroceryItem[]` as props; `SectionHeader` shows name, item count badge, expand/collapse chevron, rename pencil, delete trash (only if zero items); body is collapsible with CSS transition
-- `GroceryItem.vue`: checkbox bound to `is_checked` (calls `groceryStore.toggleChecked` on change), item name and quantity, optional meal link badges (chip per linked meal title), edit icon
-
-#### TASK-11: AddItemInline + MealLinkPicker
-- `AddItemInline.vue`: name input + optional quantity input; "Link meals" button opens `MealLinkPicker`; supports both add mode (no `itemId`) and edit mode (with `itemId`); on submit calls `groceryStore.addItem` or `updateItem`, then `linkItemToMeals` if meals were selected
-- `MealLinkPicker.vue`: modal listing all meals in `mealsStore.meals` as checkboxes (grouped by date); emits `update:modelValue` with `string[]` of meal IDs; fully reusable in add and edit flows
+**Tests**: New `MealRow.test.ts`, rewrite `MealPlanView.test.ts`, update `MealEditModal.test.ts`
 
 ---
 
-### Group 4 — Cross-Cutting Concerns ✅ COMPLETE
+#### TASK-24: Redesign GroceryListView + GroceryItem
 
-All four tasks are independent and can be built in parallel.
+**Files**: `src/views/GroceryListView.vue`, `src/components/GroceryItem.vue`
 
-#### TASK-12: Loading / error / empty states
-- Create `BaseSpinner.vue` and `BaseErrorBanner.vue` shared components in `src/components/base/`
-- `MealPlanView`: spinner while `mealsStore.loading`; error banner on `mealsStore.error`; per-day empty state: "No meals planned — add one below"
-- `GroceryListView`: spinner on initial load; error banner; full-page empty state: "Your grocery list is empty"
-- Ensure all store actions surface readable error strings (not raw Supabase error objects)
+**GroceryListView.vue**:
+- Top: text input + "Add" button (keep existing global add pattern, simplify)
+- Below: flat list of `GroceryItem` items, unchecked first then checked (dimmed)
+- Bottom: `ClearCheckedButton`
+- Remove all section rendering, AddSectionButton
+- On mount: ensure ungrouped section exists, `fetchItems()` + `subscribeRealtime()`
 
-#### TASK-13: GitHub Pages deploy config
-- `vite.config.ts`: set `base` to `'/meal-and-grocery/'`
-- `.github/workflows/deploy.yml`: trigger on push to `main`; steps: `npm ci` → `npm run build` → deploy `dist/` to `gh-pages` branch (use `peaceiris/actions-gh-pages` or `actions/deploy-pages`)
-- `.env.example`: document `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-- Note: hash router means no `404.html` redirect script is needed
+**GroceryItem.vue** — simplify:
+- Keep: checkbox + name + quantity + edit button + meal link badges
+- Add: delete button (trash icon, inline — no need to open modal to delete)
+- Tight row layout matching Anylist style
 
-#### TASK-14: PWA setup
-- Configure `vite-plugin-pwa` in `vite.config.ts` with app manifest (name, short_name, icons, theme_color, `display: standalone`)
-- Service worker caches app shell and static assets; data fetches stay network-first (no offline data sync)
-- `OfflineIndicator.vue` in `TopNav`: shows a banner when `navigator.onLine` is false
+**GroceryItemEditModal.vue** — simplify:
+- Remove section dropdown (section is always "Ungrouped")
+- Keep: name, quantity, linked meals (MealLinkPicker)
 
-#### TASK-15: Mobile responsiveness audit
-- Review all components at 375px viewport width
-- `MealPlanView`: switch to horizontal scroll of day cards on mobile (single-row, swipeable)
-- All checkboxes, icons, and tap targets must be ≥ 44px
-- Fix any Tailwind overflow/truncation issues found during audit
-- `TopNav`: ensure tabs don't overflow on small screens
+**Tests**: Rewrite `GroceryListView.test.ts`, update `GroceryItem.test.ts`, update `GroceryItemEditModal.test.ts`
 
 ---
 
-### Group 5 — Polish & Onboarding ✅ COMPLETE
+#### TASK-25: Clean up design tokens + remove dead code
 
-Both tasks are independent and can be built in parallel.
+**Files**: `src/style.css`, delete unused component files, delete unused test files
 
-#### TASK-16: Household invite / second user onboarding
-- Add `invite_code` (short random string) column to `households` table
-- After household creation, display the invite code to the first user
-- Second user: on first login with no household, show "Join existing household" option with a code input field → `householdStore.joinHousehold(code)`
+- Remove meal-type badge tokens and classes from `style.css`
+- Delete: `TimelineSelector.vue`, `DayColumn.vue`, `AddMealInline.vue`, `GrocerySection.vue`, `AddSectionButton.vue`, `grocery/AddItemInline.vue`, `MealCard.vue`
+- Delete corresponding test files
+- Remove unused imports from router, views, etc.
+- Verify no dead imports remain: `npm run build` must pass cleanly
 
-#### TASK-17: Design modernization ✅ COMPLETE
+---
 
-Design inspiration: **Notion** (off-white surfaces, bottom-border tab indicator, minimal depth) + **Anylist** (clean grocery rows, subtle separators, practical spacing). Light-only; no dark mode.
+#### TASK-26: Update tests + final verification
 
-**Tailwind v4 note**: the project uses `@tailwindcss/vite` — there is **no** `tailwind.config.js/ts`. All design tokens live in `src/style.css` via the `@theme {}` directive.
+- Run full test suite: `npm test`
+- Run build: `npm run build`
+- Fix any failures
+- Verify all touch targets remain ≥ 44px
+- Verify modal patterns (backdrop-blur, modal-panel) still work
 
-##### Design system
+---
 
-**Color palette**
+### Parallel Execution Map
+
+```
+TASK-20 (migration SQL — no code deps)
+  ↓
+TASK-21 + TASK-22 (in parallel — independent store changes)
+  ↓
+TASK-23 + TASK-24 (in parallel — independent view/component changes)
+  ↓
+TASK-25 (dead code cleanup — depends on 23+24 being done)
+  ↓
+TASK-26 (final test + build verification)
+```
+
+**Agent split for TASK-23 + TASK-24**:
+- Agent A: MealPlanView, MealRow, MealEditModal + tests
+- Agent B: GroceryListView, GroceryItem, GroceryItemEditModal + tests
+
+---
+
+### Supabase Steps (manual, before deploying new frontend)
+
+1. **Run migration**: Execute `supabase/migrations/002_meals_is_checked.sql` in Supabase SQL editor
+2. **Verify**: Confirm `meals` table now has `is_checked` column with default `false`
+3. **No RLS changes needed** — existing household-scoped policies cover all columns
+
+### Deploy Steps
+
+1. Complete all TASK-20 through TASK-26
+2. Run the Supabase migration (step above)
+3. Push to `main` — GitHub Actions will auto-deploy to GitHub Pages
+4. Smoke test: add meals, check them off, clear checked, add grocery items, link to meals, verify realtime sync between two tabs
+
+---
+
+## Key Design Decisions
+
+1. **Hash router** (`createWebHashHistory`): avoids the `404.html` redirect hack required by GitHub Pages with HTML5 history mode.
+
+2. **Household race condition guard**: `AppLayout.vue` renders `<router-view>` only when `householdStore.ready === true`. This ensures `householdId` is always available before meals/grocery stores make any Supabase queries.
+
+3. **Realtime deduplication**: all three event types (INSERT, UPDATE, DELETE) must be handled in stores. UPDATE events replace the local record by ID regardless of whether the current user triggered it.
+
+4. **RLS on the join table**: `grocery_item_meals` has no `household_id` column. Its RLS policy joins through `grocery_items → household_members`.
+
+5. **Single internal grocery section**: The DB requires `section_id` on grocery items. We keep a single "Ungrouped" section auto-created on init, but the UI never exposes section management to users.
+
+6. **Meals `is_checked`**: Added via migration 002. Checked meals are deleted on "Clear checked" (same behavior as groceries).
+
+---
+
+## Design System
+
+**Tailwind v4** — no `tailwind.config.js`. All tokens in `src/style.css` via `@theme {}`.
+
+**Color palette** (Notion-inspired, light-only):
 | Token | Hex | Usage |
 |-------|-----|-------|
 | `--color-background` | `#F7F7F5` | Page / app background |
@@ -220,170 +298,19 @@ Design inspiration: **Notion** (off-white surfaces, bottom-border tab indicator,
 | `--color-text-primary` | `#1F1F1E` | Headings, labels |
 | `--color-text-secondary` | `#787774` | Sub-labels, user email |
 | `--color-text-muted` | `#AFAFAC` | Placeholder, empty states |
-| `--color-accent` | `#2383E2` | Primary CTAs, focus rings, links |
-| `--color-accent-hover` | `#1A6FCC` | Hover state of accent |
-| `--color-danger` | `#E03E3E` | Delete, error text |
-| `--color-hover-bg` | `#F4F4F2` | Row hover background |
-| `--color-breakfast-bg/text` | `#FFF3E0` / `#C2410C` | Breakfast badge |
-| `--color-lunch-bg/text` | `#F0FDF4` / `#15803D` | Lunch badge |
-| `--color-dinner-bg/text` | `#EFF6FF` / `#1D4ED8` | Dinner badge |
+| `--color-accent` | `#2383E2` | Primary CTAs, focus rings |
+| `--color-accent-hover` | `#1A6FCC` | Hover state |
+| `--color-danger` | `#E03E3E` | Delete, errors |
+| `--color-hover-bg` | `#F4F4F2` | Row hover |
 
-**Typography**: Inter font (Google Fonts), `font-size: 14px` on `:root`, antialiased.
+**Typography**: Inter font, 14px base, antialiased.
 
-**Elevation**: cards use `shadow-sm`; modals use `shadow-2xl`.
+**Reusable classes**: `.btn-primary`, `.btn-ghost`, `.card`, `.input`, `.modal-panel`, `.nav-tab-active`
 
-**Border radius**: cards/sections `rounded-xl` (12px), buttons/inputs `rounded-md` (6px), modals `rounded-xl`, badges `rounded-full`.
-
-**Transitions**: `transition-colors duration-150` on all interactive elements.
-
-##### Reusable `@layer components` classes (defined once in `style.css`)
-
-| Class | Used on |
-|-------|---------|
-| `.btn-primary` | All primary CTA buttons (accent bg, white text) |
-| `.btn-ghost` | Secondary / text buttons (transparent, secondary text) |
-| `.card` | MealCard, household setup cards, etc. (white bg, border, shadow-sm) |
-| `.input` | All `<input>`, `<select>`, `<textarea>` (border, rounded-md, accent focus ring) |
-| `.modal-panel` | All modal inner panels (white bg, rounded-xl, shadow-2xl) |
-| `.modal-enter/leave-*` | Vue `<Transition name="modal">` — fade + scale(0.95) entrance |
-| `.badge-breakfast/lunch/dinner` | Meal type pills (token bg/text colors) |
-| `.nav-tab-active` | Active RouterLink tab (font-semibold + border-b-2 accent) |
-
-##### TDD: tests to write BEFORE implementing
-
-Write these **failing** test cases first, then implement until they pass.
-
-**`MealCard.test.ts`** — replace badge color regex assertions and add:
-```typescript
-// Replace existing /blue/, /yellow/, /green/ assertions:
-expect(badge.classes()).toContain('badge-dinner')    // was: .toMatch(/blue/)
-expect(badge.classes()).toContain('badge-breakfast') // was: .toMatch(/yellow/)
-expect(badge.classes()).toContain('badge-lunch')     // was: .toMatch(/green/)
-// Add:
-it('card root has card class', ...)  // wrapper.find('[data-testid="meal-card"]').classes().toContain('card')
-```
-
-**`MealEditModal.test.ts`** — add:
-```typescript
-it('overlay has backdrop-blur-sm class', ...) // wrapper.find('.fixed.inset-0').classes().toContain('backdrop-blur-sm')
-it('panel has modal-panel class', ...)        // wrapper.find('.modal-panel').exists()
-it('panel is wrapped in <Transition name="modal">', ...) // wrapper.findComponent(Transition).props('name') === 'modal'
-```
-
-**`MealLinkPicker.test.ts`** — add: `backdrop-blur-sm` on overlay, `modal-panel` on panel.
-
-**`GrocerySection.test.ts`** — add: rename Save button has `btn-primary` class.
-
-**Create `GroceryItemEditModal.test.ts`** (no test file currently exists) — cover: renders, save, delete, close, 44px touch targets, `backdrop-blur-sm`, `modal-panel`, `btn-primary` on save button.
-
-##### Pre-existing bug to fix during this task
-
-`GroceryItem.vue` is missing `data-testid="edit-item-btn"` on its edit button — the test at `GroceryItem.test.ts:88` already asserts for it and is currently failing. Add an explicit edit icon button with `data-testid="edit-item-btn"` and `@click.stop="$emit('edit', item)"` alongside the redesign.
-
-##### Key constraints (must not regress)
-
-- All `min-w-[44px]` / `min-h-[44px]` touch-target assertions — preserve on all interactive elements
-- `MealEditModal.test.ts` uses `.find('.fixed.inset-0')` as a selector and triggers click on it — the outermost `<div>` must keep `fixed inset-0` classes; only the **inner panel** is wrapped in `<Transition>`
-- `TopNav.test.ts` checks `hidden` + `sm:inline` on user email — preserve those classes
-- Backdrop blur goes on the `absolute inset-0` overlay div, **not** the wrapper, so it doesn't clip the modal panel
-
-##### Parallel execution (3 agents after style.css is committed)
-
-TASK-17 splits cleanly into **three non-overlapping file sets** that can be implemented simultaneously once the design tokens are in `style.css`:
-
-**Agent A — Meal components**
-`MealCard.vue`, `AddMealInline.vue`, `MealEditModal.vue`, `DayColumn.vue`, `TimelineSelector.vue`, `MealPlanView.vue`
-Tests: `MealCard.test.ts`, `MealEditModal.test.ts`, `AddMealInline.test.ts`
-
-**Agent B — Grocery components**
-`GrocerySection.vue`, `GroceryItem.vue`, `grocery/AddItemInline.vue`, `grocery/GroceryItemEditModal.vue`, `grocery/MealLinkPicker.vue`, `AddSectionButton.vue`, `ClearCheckedButton.vue`, `GroceryListView.vue`
-Tests: `GrocerySection.test.ts`, `GroceryItem.test.ts`, `GroceryItemEditModal.test.ts` (new), `MealLinkPicker.test.ts`
-
-**Agent C — Navigation, auth, and base**
-`TopNav.vue`, `OfflineIndicator.vue`, `AuthForm.vue`, `InviteCodeModal.vue`, `base/BaseSpinner.vue`, `base/BaseErrorBanner.vue`, `LoginView.vue`, `AppLayout.vue`
-Tests: `TopNav.test.ts`, `OfflineIndicator.test.ts`
-
-**Sequencing**: commit `style.css` first → launch A + B + C in parallel → final test + build verification pass.
-
-- **Deliverable**: all 3 agents pass `npm test` and `npm run build`; app is visually polished with consistent design tokens
-
----
-
-### Group 6 — Drag-to-Reorder *(after Group 5)*
-
-Both tasks are independent and can be built in parallel.
-
-#### TASK-18: Drag-to-reorder meals within a day
-- Integrate `vue-draggable-plus`
-- On drop: recompute `sort_order` for affected meals; batch-call `mealsStore.updateMeal`
-
-#### TASK-19: Grocery section drag-to-reorder
-- Same drag approach as TASK-18 for the `GrocerySection` list
-- Calls `groceryStore.reorderSections(orderedIds)` which batch-updates `sort_order`
-
----
-
-## Next Steps (after Group 4)
-
-The MVP is feature-complete. Before starting Group 5, do the following:
-
-### Supabase Setup (required before the app works)
-
-1. **Create a Supabase project** at supabase.com (free tier is sufficient for two users)
-2. **Apply the migration** — run `supabase/migrations/001_initial_schema.sql` via the Supabase SQL editor or `supabase db push` with the CLI
-3. **Configure local credentials** — copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from your project's **Settings → API** page
-4. **Add GitHub repository secrets** — add the same two env vars as secrets in GitHub repo settings so the CI deploy workflow can build correctly
-
-### Verification & QA
-
-5. **End-to-end smoke test** — log in as both users, create a household, add meals for the week, build a grocery list, link items to meals, check items off. Verify Realtime sync works across two browser tabs.
-6. **Fix any critical bugs** found during the smoke test before moving on.
-7. **Confirm GitHub Pages deployment** is live and accessible at the expected URL with correct hash routing.
-8. **Review PWA install prompt** on mobile (iOS Safari + Android Chrome) — ensure the manifest and service worker are registered correctly.
-9. **Accessibility pass** — keyboard navigation through all interactive elements, screen reader labels on icon-only buttons.
-
----
-
-## Parallel Execution Map
-
-```
-Group 0 (both in parallel):        TASK-01, TASK-02  ✅
-  ↓
-Group 1 (both in parallel):        TASK-03, TASK-04  ✅
-  ↓
-Group 2 (both in parallel):        TASK-05, TASK-06  ✅
-  ↓
-Group 3 (all 5 in parallel):       TASK-07, TASK-08, TASK-09, TASK-10, TASK-11  ✅
-  ↓
-Group 4 (all 4 in parallel):       TASK-12, TASK-13, TASK-14, TASK-15  ✅
-  ↓
-Group 5:                            TASK-16 (independent)  ✅
-                                    TASK-17 (3 internal phases — see below)  ✅
-  ↓
-Group 6 (both in parallel):        TASK-18, TASK-19
-
-TASK-17 internal phases:
-  Phase 1 (1 agent):  style.css design tokens + failing tests committed
-    ↓
-  Phase 2 (3 agents in parallel):
-    Agent A — Meal components (MealCard, MealEditModal, AddMealInline, DayColumn, TimelineSelector, MealPlanView)
-    Agent B — Grocery components (GrocerySection, GroceryItem, AddItemInline, GroceryItemEditModal, MealLinkPicker, AddSectionButton, ClearCheckedButton, GroceryListView)
-    Agent C — Nav/auth/base (TopNav, OfflineIndicator, AuthForm, InviteCodeModal, BaseSpinner, BaseErrorBanner, LoginView, AppLayout)
-    ↓
-  Phase 3 (1 agent):  full test run + build verification + push
-```
-
----
-
-## Key Design Decisions
-
-1. **Hash router** (`createWebHashHistory`): avoids the `404.html` redirect hack required by GitHub Pages with HTML5 history mode. Acceptable trade-off for a two-user private app.
-
-2. **Household race condition guard**: `AppLayout.vue` renders `<router-view>` only when `householdStore.ready === true`. This ensures `householdId` is always available before meals/grocery stores make any Supabase queries.
-
-3. **Realtime deduplication**: all three event types (INSERT, UPDATE, DELETE) must be handled in stores. UPDATE events replace the local record by ID regardless of whether the current user triggered it — avoids races between optimistic updates and incoming Realtime events.
-
-4. **RLS on the join table**: `grocery_item_meals` has no `household_id` column. Its RLS policy joins through `grocery_items → household_members`. This is the most complex policy — test it explicitly in TASK-01 before writing any frontend code.
+**Constraints**:
+- All interactive elements: `min-w-[44px] min-h-[44px]` touch targets
+- Modals: `fixed inset-0` wrapper, `backdrop-blur-sm` on overlay, `.modal-panel` on inner panel
+- TopNav: `hidden sm:inline` on user email
 
 ---
 
@@ -391,8 +318,11 @@ TASK-17 internal phases:
 
 | File | Why it matters |
 |------|----------------|
-| `meal-planner-plan.md` | Source of truth for data model, RLS policy details, and UI spec |
-| `supabase/migrations/001_initial_schema.sql` | Security boundary — RLS errors here cannot be patched on the frontend |
-| `src/lib/supabase.ts` | Imported by every store and component; must be stable before Group 1 |
-| `src/stores/auth.ts` | Gates the entire app — all other stores depend on `auth.uid()` being available |
-| `src/stores/household.ts` | Provides `householdId` that scopes every single Supabase query |
+| `supabase/migrations/001_initial_schema.sql` | Original schema + RLS |
+| `supabase/migrations/002_meals_is_checked.sql` | Adds is_checked to meals (NEW) |
+| `src/lib/supabase.ts` | Imported by every store |
+| `src/stores/auth.ts` | Gates the entire app |
+| `src/stores/household.ts` | Provides `householdId` for all queries |
+| `src/stores/meals.ts` | Meal CRUD + realtime |
+| `src/stores/grocery.ts` | Grocery CRUD + realtime |
+| `src/style.css` | Design tokens + component classes |
