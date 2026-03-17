@@ -188,4 +188,17 @@ describe('MealLinkPicker', () => {
       expect(wrapper.emitted('close')).toBeTruthy()
     })
   })
+
+  // ─── Design system classes ───────────────────────────────────────────────────
+  describe('design classes', () => {
+    it('backdrop overlay has backdrop-blur-sm class', () => {
+      const wrapper = mount(MealLinkPicker, { props: { modelValue: [] } })
+      expect(wrapper.find('[data-testid="backdrop"]').classes()).toContain('backdrop-blur-sm')
+    })
+
+    it('inner panel has modal-panel class', () => {
+      const wrapper = mount(MealLinkPicker, { props: { modelValue: [] } })
+      expect(wrapper.find('.modal-panel').exists()).toBe(true)
+    })
+  })
 })

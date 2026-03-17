@@ -39,29 +39,35 @@ describe('MealCard', () => {
     expect(wrapper.text()).toContain('Pasta')
   })
 
-  it('renders a dinner badge with blue styling', async () => {
+  it('renders a dinner badge with badge-dinner class', async () => {
     const { default: MealCard } = await import('@/components/MealCard.vue')
     const wrapper = mount(MealCard, { props: { meal: baseMeal } })
     const badge = wrapper.find('[data-testid="meal-type-badge"]')
     expect(badge.exists()).toBe(true)
     expect(badge.text().toLowerCase()).toBe('dinner')
-    expect(badge.classes().join(' ')).toMatch(/blue/)
+    expect(badge.classes()).toContain('badge-dinner')
   })
 
-  it('renders a breakfast badge with yellow styling', async () => {
+  it('renders a breakfast badge with badge-breakfast class', async () => {
     const { default: MealCard } = await import('@/components/MealCard.vue')
     const wrapper = mount(MealCard, { props: { meal: { ...baseMeal, meal_type: 'breakfast' } } })
     const badge = wrapper.find('[data-testid="meal-type-badge"]')
     expect(badge.exists()).toBe(true)
-    expect(badge.classes().join(' ')).toMatch(/yellow/)
+    expect(badge.classes()).toContain('badge-breakfast')
   })
 
-  it('renders a lunch badge with green styling', async () => {
+  it('renders a lunch badge with badge-lunch class', async () => {
     const { default: MealCard } = await import('@/components/MealCard.vue')
     const wrapper = mount(MealCard, { props: { meal: { ...baseMeal, meal_type: 'lunch' } } })
     const badge = wrapper.find('[data-testid="meal-type-badge"]')
     expect(badge.exists()).toBe(true)
-    expect(badge.classes().join(' ')).toMatch(/green/)
+    expect(badge.classes()).toContain('badge-lunch')
+  })
+
+  it('card root has card class', async () => {
+    const { default: MealCard } = await import('@/components/MealCard.vue')
+    const wrapper = mount(MealCard, { props: { meal: baseMeal } })
+    expect(wrapper.find('[data-testid="meal-card"]').classes()).toContain('card')
   })
 
   it('does not render badge when meal_type is null', async () => {

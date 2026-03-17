@@ -146,4 +146,13 @@ describe('GrocerySection.vue', () => {
     const renderedItems = wrapper.findAll('[data-testid="grocery-item"]')
     expect(renderedItems).toHaveLength(2)
   })
+
+  it('rename Save button has btn-primary class', async () => {
+    const wrapper = mount(GrocerySection, {
+      props: { section: mockSection, items: [] },
+    })
+    await wrapper.find('[data-testid="rename-btn"]').trigger('click')
+    const saveBtn = wrapper.find('[data-testid="rename-form"] button[type="submit"]')
+    expect(saveBtn.classes()).toContain('btn-primary')
+  })
 })
