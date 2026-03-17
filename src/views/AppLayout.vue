@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-background">
     <TopNav />
 
     <!-- Household init in progress -->
@@ -7,7 +7,7 @@
       v-if="!householdStore.ready && !householdStore.needsHousehold && householdStore.loading"
       class="flex items-center justify-center h-64"
     >
-      <span class="text-gray-500">Loading...</span>
+      <BaseSpinner />
     </div>
 
     <!-- Error state -->
@@ -15,26 +15,26 @@
       v-else-if="householdStore.error && !householdStore.ready && !householdStore.needsHousehold"
       class="flex items-center justify-center h-64"
     >
-      <p class="text-red-600">{{ householdStore.error }}</p>
+      <BaseErrorBanner :message="householdStore.error" />
     </div>
 
     <!-- Create or join household prompt -->
     <div
       v-else-if="householdStore.needsHousehold"
-      class="flex items-center justify-center min-h-[calc(100vh-56px)]"
+      class="flex items-center justify-center min-h-[calc(100vh-56px)] px-4"
     >
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 w-full max-w-sm">
-        <h2 class="text-xl font-semibold text-gray-900 mb-6">Get started</h2>
+      <div class="card p-8 w-full max-w-sm">
+        <h2 class="text-xl font-semibold text-text-primary mb-6">Get started</h2>
 
         <!-- Tabs -->
-        <div class="flex rounded-lg border border-gray-200 mb-6 overflow-hidden">
+        <div class="flex rounded-md border border-border mb-6 overflow-hidden">
           <button
             type="button"
             :class="[
-              'flex-1 py-2 text-sm font-medium transition-colors',
+              'flex-1 min-h-[44px] text-sm font-medium transition-colors duration-150',
               activeTab === 'create'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-50',
+                ? 'bg-accent text-white'
+                : 'text-text-secondary hover:bg-hover-bg',
             ]"
             @click="activeTab = 'create'"
           >
@@ -43,10 +43,10 @@
           <button
             type="button"
             :class="[
-              'flex-1 py-2 text-sm font-medium transition-colors',
+              'flex-1 min-h-[44px] text-sm font-medium transition-colors duration-150',
               activeTab === 'join'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-50',
+                ? 'bg-accent text-white'
+                : 'text-text-secondary hover:bg-hover-bg',
             ]"
             @click="activeTab = 'join'"
           >
@@ -56,21 +56,21 @@
 
         <!-- Create form -->
         <div v-if="activeTab === 'create'">
-          <p class="text-sm text-gray-500 mb-4">Give your household a name to get started.</p>
-          <form @submit.prevent="submitCreate">
+          <p class="text-sm text-text-secondary mb-4">Give your household a name to get started.</p>
+          <form @submit.prevent="submitCreate" class="space-y-4">
             <input
               v-model="newHouseholdName"
               type="text"
               placeholder="e.g. Our Home"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+              class="input"
               :disabled="householdStore.loading"
               required
             />
-            <p v-if="householdStore.error" class="text-sm text-red-600 mb-4">{{ householdStore.error }}</p>
+            <p v-if="householdStore.error" class="text-sm text-danger">{{ householdStore.error }}</p>
             <button
               type="submit"
               :disabled="householdStore.loading || !newHouseholdName.trim()"
-              class="w-full py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              class="btn-primary w-full"
             >
               {{ householdStore.loading ? 'Creating...' : 'Create Household' }}
             </button>
@@ -79,21 +79,21 @@
 
         <!-- Join form -->
         <div v-else>
-          <p class="text-sm text-gray-500 mb-4">Enter the invite code shared by your partner.</p>
-          <form @submit.prevent="submitJoin">
+          <p class="text-sm text-text-secondary mb-4">Enter the invite code shared by your partner.</p>
+          <form @submit.prevent="submitJoin" class="space-y-4">
             <input
               v-model="inviteCodeInput"
               type="text"
               placeholder="e.g. abc12345"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+              class="input font-mono"
               :disabled="householdStore.loading"
               required
             />
-            <p v-if="householdStore.error" class="text-sm text-red-600 mb-4">{{ householdStore.error }}</p>
+            <p v-if="householdStore.error" class="text-sm text-danger">{{ householdStore.error }}</p>
             <button
               type="submit"
               :disabled="householdStore.loading || !inviteCodeInput.trim()"
-              class="w-full py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              class="btn-primary w-full"
             >
               {{ householdStore.loading ? 'Joining...' : 'Join Household' }}
             </button>
@@ -105,24 +105,24 @@
     <!-- Invite code display (shown after creating a household) -->
     <div
       v-else-if="householdStore.justCreated && !inviteCodeDismissed"
-      class="flex items-center justify-center min-h-[calc(100vh-56px)]"
+      class="flex items-center justify-center min-h-[calc(100vh-56px)] px-4"
     >
-      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 w-full max-w-sm text-center">
+      <div class="card p-8 w-full max-w-sm text-center">
         <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 class="text-xl font-semibold text-gray-900 mb-2">Household created!</h2>
-        <p class="text-sm text-gray-500 mb-6">Share this invite code with your partner so they can join.</p>
-        <div class="bg-gray-100 rounded-lg px-6 py-4 mb-6">
-          <p class="text-2xl font-mono font-bold tracking-widest text-gray-900">
+        <h2 class="text-xl font-semibold text-text-primary mb-2">Household created!</h2>
+        <p class="text-sm text-text-secondary mb-6">Share this invite code with your partner so they can join.</p>
+        <div class="bg-hover-bg rounded-lg px-6 py-4 mb-6 border border-border">
+          <p class="text-2xl font-mono font-bold tracking-widest text-text-primary">
             {{ householdStore.inviteCode }}
           </p>
         </div>
         <button
           type="button"
-          class="w-full py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          class="btn-primary w-full"
           @click="inviteCodeDismissed = true"
         >
           Continue to app
@@ -141,6 +141,8 @@
 import { ref, onMounted } from 'vue'
 import { useHouseholdStore } from '@/stores/household'
 import TopNav from '@/components/TopNav.vue'
+import BaseSpinner from '@/components/base/BaseSpinner.vue'
+import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
 
 const householdStore = useHouseholdStore()
 const newHouseholdName = ref('')

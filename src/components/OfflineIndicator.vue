@@ -2,7 +2,7 @@
   <div
     v-if="isOffline"
     data-testid="offline-banner"
-    class="fixed top-0 inset-x-0 bg-yellow-400 text-yellow-900 text-sm text-center py-1 z-50"
+    class="fixed top-0 inset-x-0 bg-yellow-400 text-yellow-900 text-sm text-center py-1 z-50 font-medium"
   >
     You are offline — changes will sync when reconnected
   </div>
