@@ -3,10 +3,11 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
-const { mockAddMeal, mockMealsStore, mockHouseholdStore } = vi.hoisted(() => ({
+const { mockAddMeal, mockMealsStore, mockHouseholdStore, mockAuthStore } = vi.hoisted(() => ({
   mockAddMeal: vi.fn(),
   mockMealsStore: vi.fn(),
   mockHouseholdStore: vi.fn(),
+  mockAuthStore: vi.fn(),
 }))
 
 vi.mock('@/stores/meals', () => ({
@@ -15,6 +16,10 @@ vi.mock('@/stores/meals', () => ({
 
 vi.mock('@/stores/household', () => ({
   useHouseholdStore: mockHouseholdStore,
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: mockAuthStore,
 }))
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -30,6 +35,10 @@ beforeEach(() => {
 
   mockHouseholdStore.mockReturnValue({
     householdId: 'hh-1',
+  })
+
+  mockAuthStore.mockReturnValue({
+    user: { id: 'user-1' },
   })
 })
 

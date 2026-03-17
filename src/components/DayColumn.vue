@@ -1,6 +1,6 @@
 <template>
   <div class="min-w-48 flex-shrink-0">
-    <h3 data-testid="day-heading" class="font-semibold text-sm mb-2 text-gray-700">
+    <h3 data-testid="day-heading" class="font-semibold text-sm mb-2" style="color: var(--color-text-primary)">
       {{ formattedDate }}
     </h3>
     <MealCard v-for="meal in meals" :key="meal.id" :meal="meal" />

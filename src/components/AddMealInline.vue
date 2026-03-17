@@ -4,12 +4,12 @@
       v-model="title"
       type="text"
       placeholder="Add a meal..."
-      class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+      class="input"
     />
-    <p v-if="validationError" class="text-red-500 text-xs">{{ validationError }}</p>
+    <p v-if="validationError" class="text-xs" style="color: var(--color-danger)">{{ validationError }}</p>
     <select
       v-model="mealType"
-      class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+      class="input"
     >
       <option value="">— (no type)</option>
       <option value="breakfast">Breakfast</option>
@@ -19,7 +19,7 @@
     <button
       type="submit"
       :disabled="isLoading"
-      class="bg-blue-500 text-white rounded px-3 py-1 text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="btn-primary"
     >
       {{ isLoading ? 'Adding…' : 'Add' }}
     </button>
