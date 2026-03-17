@@ -1,22 +1,22 @@
 <template>
   <div class="flex items-center gap-2 flex-wrap">
     <button
-      class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
-      :class="activePreset === 'this-week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+      class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150"
+      :class="activePreset === 'this-week' ? 'btn-primary' : 'btn-ghost'"
       @click="selectThisWeek"
     >
       This Week
     </button>
     <button
-      class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
-      :class="activePreset === 'next-week' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+      class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150"
+      :class="activePreset === 'next-week' ? 'btn-primary' : 'btn-ghost'"
       @click="selectNextWeek"
     >
       Next Week
     </button>
     <button
-      class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
-      :class="activePreset === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+      class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150"
+      :class="activePreset === 'custom' ? 'btn-primary' : 'btn-ghost'"
       @click="selectCustom"
     >
       Custom Range
@@ -25,14 +25,14 @@
       <input
         v-model="customStart"
         type="date"
-        class="border rounded px-2 py-1 text-sm"
+        class="input w-auto"
         @change="applyCustomRange"
       />
-      <span class="text-gray-400 text-sm">to</span>
+      <span class="text-sm" style="color: var(--color-text-muted)">to</span>
       <input
         v-model="customEnd"
         type="date"
-        class="border rounded px-2 py-1 text-sm"
+        class="input w-auto"
         @change="applyCustomRange"
       />
     </template>

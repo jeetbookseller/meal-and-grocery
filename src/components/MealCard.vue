@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-lg border border-gray-200 p-3 mb-2">
+  <div data-testid="meal-card" class="card p-3 mb-2">
     <div class="flex items-start justify-between gap-2">
       <!-- Left: title + badge + notes -->
       <div class="flex-1 min-w-0">
@@ -8,8 +8,7 @@
           <span
             v-if="meal.meal_type"
             data-testid="meal-type-badge"
-            :class="badgeClass"
-            class="text-xs px-1.5 py-0.5 rounded-full font-medium capitalize"
+            :class="`badge-${meal.meal_type}`"
           >
             {{ meal.meal_type }}
           </span>
@@ -18,7 +17,8 @@
         <button
           v-if="meal.notes"
           data-testid="notes-toggle"
-          class="text-xs text-gray-400 mt-1 hover:text-gray-600"
+          class="text-xs mt-1 transition-colors duration-150"
+          style="color: var(--color-text-muted)"
           @click="notesOpen = !notesOpen"
         >
           {{ notesOpen ? 'Hide notes' : 'Show notes' }}
@@ -27,7 +27,8 @@
         <p
           v-if="notesOpen && meal.notes"
           data-testid="meal-notes"
-          class="text-xs text-gray-600 mt-1 whitespace-pre-line"
+          class="text-xs mt-1 whitespace-pre-line"
+          style="color: var(--color-text-secondary)"
         >
           {{ meal.notes }}
         </p>
@@ -38,7 +39,8 @@
         <button
           data-testid="edit-btn"
           aria-label="Edit meal"
-          class="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 rounded"
+          class="min-w-[44px] min-h-[44px] flex items-center justify-center rounded transition-colors duration-150"
+          style="color: var(--color-text-muted)"
           @click="editOpen = true"
         >
           <!-- pencil icon -->
@@ -49,7 +51,8 @@
         <button
           data-testid="delete-btn"
           aria-label="Delete meal"
-          class="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 rounded"
+          class="min-w-[44px] min-h-[44px] flex items-center justify-center rounded transition-colors duration-150"
+          style="color: var(--color-text-muted)"
           @click="handleDelete"
         >
           <!-- trash icon -->
@@ -68,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { Meal } from '@/types/database'
 import { useMealsStore } from '@/stores/meals'
 import MealEditModal from '@/components/MealEditModal.vue'
@@ -78,19 +81,6 @@ const props = defineProps<{ meal: Meal }>()
 const mealsStore = useMealsStore()
 const notesOpen = ref(false)
 const editOpen = ref(false)
-
-const badgeClass = computed(() => {
-  switch (props.meal.meal_type) {
-    case 'breakfast':
-      return 'bg-yellow-100 text-yellow-800'
-    case 'lunch':
-      return 'bg-green-100 text-green-800'
-    case 'dinner':
-      return 'bg-blue-100 text-blue-800'
-    default:
-      return ''
-  }
-})
 
 function handleDelete() {
   if (window.confirm(`Delete "${props.meal.title}"?`)) {
