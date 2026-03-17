@@ -1,8 +1,7 @@
 <template>
   <div
     data-testid="grocery-item"
-    class="flex items-center gap-2 py-2 px-1 cursor-pointer hover:bg-gray-50"
-    @click="$emit('edit', item)"
+    class="flex items-center gap-2 py-2 px-1 hover:bg-gray-50"
   >
     <label
       class="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
@@ -33,6 +32,16 @@
         </span>
       </div>
     </div>
+    <button
+      data-testid="edit-item-btn"
+      aria-label="Edit item"
+      class="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 rounded flex-shrink-0"
+      @click.stop="$emit('edit', item)"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+      </svg>
+    </button>
   </div>
 </template>
 

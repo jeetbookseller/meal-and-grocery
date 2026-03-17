@@ -151,4 +151,21 @@ describe('MealEditModal.vue', () => {
     await wrapper.find('.fixed.inset-0').trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
   })
+
+  it('overlay has backdrop-blur-sm class', async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find('.fixed.inset-0').classes()).toContain('backdrop-blur-sm')
+  })
+
+  it('panel has modal-panel class', async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find('.modal-panel').exists()).toBe(true)
+  })
+
+  it('panel is wrapped in <Transition name="modal">', async () => {
+    const { default: MealEditModal } = await import('@/components/MealEditModal.vue')
+    const { Transition } = await import('vue')
+    const wrapper = mount(MealEditModal, { props: { meal: mockMeal }, attachTo: document.body })
+    expect(wrapper.findComponent(Transition).props('name')).toBe('modal')
+  })
 })
