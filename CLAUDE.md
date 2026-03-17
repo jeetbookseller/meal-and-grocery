@@ -204,15 +204,108 @@ Both tasks are independent and can be built in parallel.
 - Second user: on first login with no household, show "Join existing household" option with a code input field → `householdStore.joinHousehold(code)`
 
 #### TASK-17: Design modernization
-- Audit the full app UI and establish a consistent visual design system (color palette, typography scale, spacing, border radii, shadows)
-- Replace ad-hoc Tailwind classes with a coherent design token set (via `tailwind.config.ts` theme extension)
-- Modernize component styling: cards with subtle shadows and rounded corners, smooth transitions on interactive elements, consistent focus rings for accessibility
-- Improve `TopNav`: refined tab design with active indicator, polished user avatar/logout area
-- Improve `MealCard`: cleaner layout, better meal-type badge styling, hover/active states
-- Improve `GroceryItem` + `GrocerySection`: refined checkbox, better spacing, section header polish
-- Improve modals (`MealEditModal`, `MealLinkPicker`): backdrop blur, entrance animation, consistent button styles
-- Ensure design is cohesive across both light and dark system color schemes (or explicitly commit to light-only with a comment)
-- **Deliverable**: visually polished app that feels intentional and modern, not a default Tailwind skeleton
+
+Design inspiration: **Notion** (off-white surfaces, bottom-border tab indicator, minimal depth) + **Anylist** (clean grocery rows, subtle separators, practical spacing). Light-only; no dark mode.
+
+**Tailwind v4 note**: the project uses `@tailwindcss/vite` — there is **no** `tailwind.config.js/ts`. All design tokens live in `src/style.css` via the `@theme {}` directive.
+
+##### Design system
+
+**Color palette**
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--color-background` | `#F7F7F5` | Page / app background |
+| `--color-surface` | `#FFFFFF` | Cards, modals, nav |
+| `--color-border` | `#E8E8E5` | All borders |
+| `--color-text-primary` | `#1F1F1E` | Headings, labels |
+| `--color-text-secondary` | `#787774` | Sub-labels, user email |
+| `--color-text-muted` | `#AFAFAC` | Placeholder, empty states |
+| `--color-accent` | `#2383E2` | Primary CTAs, focus rings, links |
+| `--color-accent-hover` | `#1A6FCC` | Hover state of accent |
+| `--color-danger` | `#E03E3E` | Delete, error text |
+| `--color-hover-bg` | `#F4F4F2` | Row hover background |
+| `--color-breakfast-bg/text` | `#FFF3E0` / `#C2410C` | Breakfast badge |
+| `--color-lunch-bg/text` | `#F0FDF4` / `#15803D` | Lunch badge |
+| `--color-dinner-bg/text` | `#EFF6FF` / `#1D4ED8` | Dinner badge |
+
+**Typography**: Inter font (Google Fonts), `font-size: 14px` on `:root`, antialiased.
+
+**Elevation**: cards use `shadow-sm`; modals use `shadow-2xl`.
+
+**Border radius**: cards/sections `rounded-xl` (12px), buttons/inputs `rounded-md` (6px), modals `rounded-xl`, badges `rounded-full`.
+
+**Transitions**: `transition-colors duration-150` on all interactive elements.
+
+##### Reusable `@layer components` classes (defined once in `style.css`)
+
+| Class | Used on |
+|-------|---------|
+| `.btn-primary` | All primary CTA buttons (accent bg, white text) |
+| `.btn-ghost` | Secondary / text buttons (transparent, secondary text) |
+| `.card` | MealCard, household setup cards, etc. (white bg, border, shadow-sm) |
+| `.input` | All `<input>`, `<select>`, `<textarea>` (border, rounded-md, accent focus ring) |
+| `.modal-panel` | All modal inner panels (white bg, rounded-xl, shadow-2xl) |
+| `.modal-enter/leave-*` | Vue `<Transition name="modal">` — fade + scale(0.95) entrance |
+| `.badge-breakfast/lunch/dinner` | Meal type pills (token bg/text colors) |
+| `.nav-tab-active` | Active RouterLink tab (font-semibold + border-b-2 accent) |
+
+##### TDD: tests to write BEFORE implementing
+
+Write these **failing** test cases first, then implement until they pass.
+
+**`MealCard.test.ts`** — replace badge color regex assertions and add:
+```typescript
+// Replace existing /blue/, /yellow/, /green/ assertions:
+expect(badge.classes()).toContain('badge-dinner')    // was: .toMatch(/blue/)
+expect(badge.classes()).toContain('badge-breakfast') // was: .toMatch(/yellow/)
+expect(badge.classes()).toContain('badge-lunch')     // was: .toMatch(/green/)
+// Add:
+it('card root has card class', ...)  // wrapper.find('[data-testid="meal-card"]').classes().toContain('card')
+```
+
+**`MealEditModal.test.ts`** — add:
+```typescript
+it('overlay has backdrop-blur-sm class', ...) // wrapper.find('.fixed.inset-0').classes().toContain('backdrop-blur-sm')
+it('panel has modal-panel class', ...)        // wrapper.find('.modal-panel').exists()
+it('panel is wrapped in <Transition name="modal">', ...) // wrapper.findComponent(Transition).props('name') === 'modal'
+```
+
+**`MealLinkPicker.test.ts`** — add: `backdrop-blur-sm` on overlay, `modal-panel` on panel.
+
+**`GrocerySection.test.ts`** — add: rename Save button has `btn-primary` class.
+
+**Create `GroceryItemEditModal.test.ts`** (no test file currently exists) — cover: renders, save, delete, close, 44px touch targets, `backdrop-blur-sm`, `modal-panel`, `btn-primary` on save button.
+
+##### Pre-existing bug to fix during this task
+
+`GroceryItem.vue` is missing `data-testid="edit-item-btn"` on its edit button — the test at `GroceryItem.test.ts:88` already asserts for it and is currently failing. Add an explicit edit icon button with `data-testid="edit-item-btn"` and `@click.stop="$emit('edit', item)"` alongside the redesign.
+
+##### Key constraints (must not regress)
+
+- All `min-w-[44px]` / `min-h-[44px]` touch-target assertions — preserve on all interactive elements
+- `MealEditModal.test.ts` uses `.find('.fixed.inset-0')` as a selector and triggers click on it — the outermost `<div>` must keep `fixed inset-0` classes; only the **inner panel** is wrapped in `<Transition>`
+- `TopNav.test.ts` checks `hidden` + `sm:inline` on user email — preserve those classes
+- Backdrop blur goes on the `absolute inset-0` overlay div, **not** the wrapper, so it doesn't clip the modal panel
+
+##### Parallel execution (3 agents after style.css is committed)
+
+TASK-17 splits cleanly into **three non-overlapping file sets** that can be implemented simultaneously once the design tokens are in `style.css`:
+
+**Agent A — Meal components**
+`MealCard.vue`, `AddMealInline.vue`, `MealEditModal.vue`, `DayColumn.vue`, `TimelineSelector.vue`, `MealPlanView.vue`
+Tests: `MealCard.test.ts`, `MealEditModal.test.ts`, `AddMealInline.test.ts`
+
+**Agent B — Grocery components**
+`GrocerySection.vue`, `GroceryItem.vue`, `grocery/AddItemInline.vue`, `grocery/GroceryItemEditModal.vue`, `grocery/MealLinkPicker.vue`, `AddSectionButton.vue`, `ClearCheckedButton.vue`, `GroceryListView.vue`
+Tests: `GrocerySection.test.ts`, `GroceryItem.test.ts`, `GroceryItemEditModal.test.ts` (new), `MealLinkPicker.test.ts`
+
+**Agent C — Navigation, auth, and base**
+`TopNav.vue`, `OfflineIndicator.vue`, `AuthForm.vue`, `InviteCodeModal.vue`, `base/BaseSpinner.vue`, `base/BaseErrorBanner.vue`, `LoginView.vue`, `AppLayout.vue`
+Tests: `TopNav.test.ts`, `OfflineIndicator.test.ts`
+
+**Sequencing**: commit `style.css` first → launch A + B + C in parallel → final test + build verification pass.
+
+- **Deliverable**: all 3 agents pass `npm test` and `npm run build`; app is visually polished with consistent design tokens
 
 ---
 
@@ -264,9 +357,20 @@ Group 3 (all 5 in parallel):       TASK-07, TASK-08, TASK-09, TASK-10, TASK-11  
   ↓
 Group 4 (all 4 in parallel):       TASK-12, TASK-13, TASK-14, TASK-15  ✅
   ↓
-Group 5 (both in parallel):        TASK-16, TASK-17
+Group 5:                            TASK-16 (independent)
+                                    TASK-17 (3 internal phases — see below)
   ↓
 Group 6 (both in parallel):        TASK-18, TASK-19
+
+TASK-17 internal phases:
+  Phase 1 (1 agent):  style.css design tokens + failing tests committed
+    ↓
+  Phase 2 (3 agents in parallel):
+    Agent A — Meal components (MealCard, MealEditModal, AddMealInline, DayColumn, TimelineSelector, MealPlanView)
+    Agent B — Grocery components (GrocerySection, GroceryItem, AddItemInline, GroceryItemEditModal, MealLinkPicker, AddSectionButton, ClearCheckedButton, GroceryListView)
+    Agent C — Nav/auth/base (TopNav, OfflineIndicator, AuthForm, InviteCodeModal, BaseSpinner, BaseErrorBanner, LoginView, AppLayout)
+    ↓
+  Phase 3 (1 agent):  full test run + build verification + push
 ```
 
 ---
