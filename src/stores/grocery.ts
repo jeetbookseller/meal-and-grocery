@@ -1,61 +1,41 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useHouseholdStore } from '@/stores/household'
 import type { GrocerySection, GroceryItem } from '@/types/database'
 
 export const useGroceryStore = defineStore('grocery', () => {
-  const sections = ref<GrocerySection[]>([])
+  // Internal — never exposed publicly
+  const _sections = ref<GrocerySection[]>([])
+
   const items = ref<GroceryItem[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  let sectionsChannel: ReturnType<typeof supabase.channel> | null = null
   let itemsChannel: ReturnType<typeof supabase.channel> | null = null
 
-  const itemsBySection = computed(() => {
-    const map: Record<string, GroceryItem[]> = {}
-    for (const item of items.value) {
-      if (!map[item.section_id]) map[item.section_id] = []
-      map[item.section_id].push(item)
-    }
-    return map
-  })
-
-  const ungroupedSection = computed(() =>
-    sections.value.find(s => s.name === 'Ungrouped') ?? null
-  )
-
-  async function ensureUngroupedSection() {
+  async function _fetchSections() {
     const householdId = useHouseholdStore().householdId
     if (!householdId) return
-    if (sections.value.some(s => s.name === 'Ungrouped')) return
+    const { data } = await supabase
+      .from('grocery_sections')
+      .select('*')
+      .eq('household_id', householdId)
+      .order('sort_order')
+    _sections.value = data ?? []
+  }
+
+  async function _ensureUngroupedSection() {
+    const householdId = useHouseholdStore().householdId
+    if (!householdId) return
+    if (_sections.value.length === 0) await _fetchSections()
+    if (_sections.value.some(s => s.name === 'Ungrouped')) return
     const { data, error: insertError } = await supabase
       .from('grocery_sections')
       .insert({ household_id: householdId, name: 'Ungrouped', sort_order: -1, is_default: false })
       .select()
       .single()
-    if (!insertError && data) sections.value.unshift(data)
-  }
-
-  async function fetchSections() {
-    const householdId = useHouseholdStore().householdId
-    if (!householdId) return
-    loading.value = true
-    error.value = null
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('grocery_sections')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('sort_order')
-      if (fetchError) throw fetchError
-      sections.value = data ?? []
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to fetch sections'
-    } finally {
-      loading.value = false
-    }
+    if (!insertError && data) _sections.value.unshift(data)
   }
 
   async function fetchItems() {
@@ -78,85 +58,20 @@ export const useGroceryStore = defineStore('grocery', () => {
     }
   }
 
-  async function addSection(name: string) {
-    const householdId = useHouseholdStore().householdId
-    if (!householdId) return
-    error.value = null
-    const nextOrder = sections.value.length > 0
-      ? Math.max(...sections.value.map(s => s.sort_order)) + 1
-      : 0
-    try {
-      const { data, error: insertError } = await supabase
-        .from('grocery_sections')
-        .insert({ household_id: householdId, name, sort_order: nextOrder, is_default: false })
-        .select()
-        .single()
-      if (insertError) throw insertError
-      sections.value.push(data)
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to add section'
-    }
-  }
-
-  async function renameSection(id: string, name: string) {
-    error.value = null
-    const idx = sections.value.findIndex(s => s.id === id)
-    if (idx !== -1) sections.value[idx] = { ...sections.value[idx], name }
-    try {
-      const { error: updateError } = await supabase
-        .from('grocery_sections')
-        .update({ name })
-        .eq('id', id)
-      if (updateError) throw updateError
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to rename section'
-    }
-  }
-
-  async function deleteSection(id: string) {
-    error.value = null
-    const idx = sections.value.findIndex(s => s.id === id)
-    if (idx !== -1) sections.value.splice(idx, 1)
-    try {
-      const { error: deleteError } = await supabase
-        .from('grocery_sections')
-        .delete()
-        .eq('id', id)
-      if (deleteError) throw deleteError
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to delete section'
-    }
-  }
-
-  async function reorderSections(orderedIds: string[]) {
-    error.value = null
-    orderedIds.forEach((id, index) => {
-      const idx = sections.value.findIndex(s => s.id === id)
-      if (idx !== -1) sections.value[idx] = { ...sections.value[idx], sort_order: index }
-    })
-    try {
-      await Promise.all(
-        orderedIds.map((id, index) =>
-          supabase.from('grocery_sections').update({ sort_order: index }).eq('id', id)
-        )
-      )
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to reorder sections'
-    }
-  }
-
   async function addItem(payload: {
     name: string
     quantity?: string | null
-    section_id: string
     household_id: string
   }) {
     error.value = null
-    const nextOrder = items.value.filter(i => i.section_id === payload.section_id).length
+    await _ensureUngroupedSection()
+    const section = _sections.value.find(s => s.name === 'Ungrouped')
+    if (!section) return
+    const nextOrder = items.value.length
     try {
       const { data, error: insertError } = await supabase
         .from('grocery_items')
-        .insert({ ...payload, is_checked: false, sort_order: nextOrder })
+        .insert({ ...payload, section_id: section.id, is_checked: false, sort_order: nextOrder })
         .select()
         .single()
       if (insertError) throw insertError
@@ -247,26 +162,6 @@ export const useGroceryStore = defineStore('grocery', () => {
     const householdId = useHouseholdStore().householdId
     if (!householdId) return
 
-    sectionsChannel = supabase
-      .channel('grocery-sections-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'grocery_sections', filter: `household_id=eq.${householdId}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const exists = sections.value.some(s => s.id === (payload.new as GrocerySection).id)
-            if (!exists) sections.value.push(payload.new as GrocerySection)
-          } else if (payload.eventType === 'UPDATE') {
-            const idx = sections.value.findIndex(s => s.id === (payload.new as GrocerySection).id)
-            if (idx !== -1) sections.value[idx] = payload.new as GrocerySection
-          } else if (payload.eventType === 'DELETE') {
-            const idx = sections.value.findIndex(s => s.id === (payload.old as GrocerySection).id)
-            if (idx !== -1) sections.value.splice(idx, 1)
-          }
-        }
-      )
-      .subscribe()
-
     itemsChannel = supabase
       .channel('grocery-items-changes')
       .on(
@@ -289,10 +184,6 @@ export const useGroceryStore = defineStore('grocery', () => {
   }
 
   async function unsubscribeRealtime() {
-    if (sectionsChannel) {
-      await supabase.removeChannel(sectionsChannel)
-      sectionsChannel = null
-    }
     if (itemsChannel) {
       await supabase.removeChannel(itemsChannel)
       itemsChannel = null
@@ -300,19 +191,10 @@ export const useGroceryStore = defineStore('grocery', () => {
   }
 
   return {
-    sections,
     items,
     loading,
     error,
-    itemsBySection,
-    ungroupedSection,
-    ensureUngroupedSection,
-    fetchSections,
     fetchItems,
-    addSection,
-    renameSection,
-    deleteSection,
-    reorderSections,
     addItem,
     updateItem,
     deleteItem,
