@@ -28,7 +28,7 @@ let realtimeCallback: ((payload: Record<string, unknown>) => void) | null = null
 /** Creates a chainable Supabase query builder mock */
 function makeBuilder(result: { data: unknown; error: unknown }) {
   const b: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'gte', 'lte', 'order', 'insert', 'update', 'delete', 'maybeSingle']) {
+  for (const m of ['select', 'eq', 'order', 'insert', 'update', 'delete', 'maybeSingle', 'in']) {
     b[m] = vi.fn().mockReturnValue(b)
   }
   // terminal: .single() resolves
@@ -60,19 +60,17 @@ const mockMeal: Meal = {
   title: 'Pasta',
   notes: null,
   sort_order: 0,
+  is_checked: false,
   created_by: 'user-1',
   created_at: '2026-03-16T00:00:00Z',
   updated_at: '2026-03-16T00:00:00Z',
 }
 
-const addPayload: Omit<Meal, 'id' | 'created_at' | 'updated_at'> = {
-  household_id: 'hh-1',
-  date: '2026-03-16',
-  meal_type: 'dinner',
+const addPayload = {
   title: 'Pasta',
-  notes: null,
+  household_id: 'hh-1',
   sort_order: 0,
-  created_by: 'user-1',
+  is_checked: false,
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -87,12 +85,11 @@ beforeEach(() => {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 describe('useMealsStore', () => {
   describe('fetchMeals()', () => {
-    it('fetches meals and sets state when householdId and range are set', async () => {
+    it('fetches all meals for household ordered by sort_order', async () => {
       mockFrom.mockReturnValue(makeBuilder({ data: [mockMeal], error: null }))
 
       const { useMealsStore } = await import('@/stores/meals')
       const store = useMealsStore()
-      store.selectedRange = { start: '2026-03-16', end: '2026-03-22' }
 
       await store.fetchMeals()
 
@@ -107,17 +104,6 @@ describe('useMealsStore', () => {
 
       const { useMealsStore } = await import('@/stores/meals')
       const store = useMealsStore()
-      store.selectedRange = { start: '2026-03-16', end: '2026-03-22' }
-
-      await store.fetchMeals()
-
-      expect(mockFrom).not.toHaveBeenCalled()
-    })
-
-    it('returns early when range start is not set', async () => {
-      const { useMealsStore } = await import('@/stores/meals')
-      const store = useMealsStore()
-      // selectedRange.start is '' by default
 
       await store.fetchMeals()
 
@@ -129,27 +115,12 @@ describe('useMealsStore', () => {
 
       const { useMealsStore } = await import('@/stores/meals')
       const store = useMealsStore()
-      store.selectedRange = { start: '2026-03-16', end: '2026-03-22' }
 
       await store.fetchMeals()
 
       expect(store.error).toBe('DB error')
       expect(store.meals).toEqual([])
       expect(store.loading).toBe(false)
-    })
-  })
-
-  describe('setRange()', () => {
-    it('updates selectedRange and triggers fetchMeals', async () => {
-      mockFrom.mockReturnValue(makeBuilder({ data: [mockMeal], error: null }))
-
-      const { useMealsStore } = await import('@/stores/meals')
-      const store = useMealsStore()
-
-      await store.setRange('2026-03-16', '2026-03-22')
-
-      expect(store.selectedRange).toEqual({ start: '2026-03-16', end: '2026-03-22' })
-      expect(mockFrom).toHaveBeenCalledWith('meals')
     })
   })
 
@@ -256,6 +227,100 @@ describe('useMealsStore', () => {
     })
   })
 
+  describe('toggleChecked()', () => {
+    it('optimistically toggles is_checked to true', async () => {
+      const checkedMeal = { ...mockMeal, is_checked: true }
+      mockFrom.mockReturnValue(makeBuilder({ data: checkedMeal, error: null }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [{ ...mockMeal, is_checked: false }]
+
+      await store.toggleChecked('meal-1')
+
+      expect(store.meals[0].is_checked).toBe(true)
+      expect(store.error).toBeNull()
+    })
+
+    it('optimistically toggles is_checked back to false', async () => {
+      const uncheckedMeal = { ...mockMeal, is_checked: false }
+      mockFrom.mockReturnValue(makeBuilder({ data: uncheckedMeal, error: null }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [{ ...mockMeal, is_checked: true }]
+
+      await store.toggleChecked('meal-1')
+
+      expect(store.meals[0].is_checked).toBe(false)
+    })
+
+    it('does nothing when meal id is not found', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [mockMeal]
+
+      await store.toggleChecked('nonexistent')
+
+      expect(mockFrom).not.toHaveBeenCalled()
+      expect(store.meals).toEqual([mockMeal])
+    })
+
+    it('reverts on DB failure', async () => {
+      mockFrom.mockReturnValue(makeBuilder({ data: null, error: { message: 'Toggle failed' } }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [{ ...mockMeal, is_checked: false }]
+
+      await store.toggleChecked('meal-1')
+
+      expect(store.meals[0].is_checked).toBe(false)
+      expect(store.error).toBe('Toggle failed')
+    })
+  })
+
+  describe('clearChecked()', () => {
+    it('removes all checked meals from local state and DB', async () => {
+      mockFrom.mockReturnValue(makeBuilder({ data: null, error: null }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      const checkedMeal = { ...mockMeal, id: 'meal-2', is_checked: true }
+      store.meals = [mockMeal, checkedMeal]
+
+      await store.clearChecked()
+
+      expect(store.meals).toEqual([mockMeal])
+      expect(store.error).toBeNull()
+    })
+
+    it('does nothing when no meals are checked', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [mockMeal]
+
+      await store.clearChecked()
+
+      expect(mockFrom).not.toHaveBeenCalled()
+      expect(store.meals).toEqual([mockMeal])
+    })
+
+    it('reverts on DB failure', async () => {
+      mockFrom.mockReturnValue(makeBuilder({ data: null, error: { message: 'Clear failed' } }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      const checkedMeal = { ...mockMeal, id: 'meal-2', is_checked: true }
+      store.meals = [mockMeal, checkedMeal]
+
+      await store.clearChecked()
+
+      expect(store.meals).toContainEqual(checkedMeal)
+      expect(store.error).toBe('Clear failed')
+    })
+  })
+
   describe('subscribeRealtime()', () => {
     it('creates a channel with the correct household filter', async () => {
       const ch = makeChannelMock()
@@ -340,24 +405,6 @@ describe('useMealsStore', () => {
       store.unsubscribeRealtime()
 
       expect(mockRemoveChannel).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('mealsByDate computed', () => {
-    it('groups meals by date and sorts by sort_order', async () => {
-      const mealA: Meal = { ...mockMeal, id: 'a', date: '2026-03-16', sort_order: 2 }
-      const mealB: Meal = { ...mockMeal, id: 'b', date: '2026-03-16', sort_order: 0 }
-      const mealC: Meal = { ...mockMeal, id: 'c', date: '2026-03-17', sort_order: 0 }
-
-      const { useMealsStore } = await import('@/stores/meals')
-      const store = useMealsStore()
-      store.meals = [mealA, mealB, mealC]
-
-      const byDate = store.mealsByDate
-      expect(Object.keys(byDate)).toHaveLength(2)
-      expect(byDate['2026-03-16'][0].id).toBe('b')
-      expect(byDate['2026-03-16'][1].id).toBe('a')
-      expect(byDate['2026-03-17'][0].id).toBe('c')
     })
   })
 })

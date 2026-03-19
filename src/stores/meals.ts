@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Meal } from '@/types/database'
 import { supabase } from '@/lib/supabase'
@@ -10,23 +10,10 @@ export const useMealsStore = defineStore('meals', () => {
   const meals = ref<Meal[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
-  const selectedRange = ref<{ start: string; end: string }>({ start: '', end: '' })
-
-  const mealsByDate = computed(() => {
-    const map: Record<string, Meal[]> = {}
-    for (const meal of meals.value) {
-      if (!map[meal.date]) map[meal.date] = []
-      map[meal.date].push(meal)
-    }
-    for (const date in map) {
-      map[date].sort((a, b) => a.sort_order - b.sort_order)
-    }
-    return map
-  })
 
   async function fetchMeals() {
     const householdStore = useHouseholdStore()
-    if (!householdStore.householdId || !selectedRange.value.start) return
+    if (!householdStore.householdId) return
 
     loading.value = true
     error.value = null
@@ -36,9 +23,6 @@ export const useMealsStore = defineStore('meals', () => {
         .from('meals')
         .select('*')
         .eq('household_id', householdStore.householdId)
-        .gte('date', selectedRange.value.start)
-        .lte('date', selectedRange.value.end)
-        .order('date')
         .order('sort_order')
 
       if (fetchError) throw new Error(fetchError.message)
@@ -51,20 +35,25 @@ export const useMealsStore = defineStore('meals', () => {
     }
   }
 
-  function setRange(start: string, end: string) {
-    selectedRange.value = { start, end }
-    return fetchMeals()
-  }
-
-  async function addMeal(payload: Omit<Meal, 'id' | 'created_at' | 'updated_at'>) {
+  async function addMeal(payload: { title: string; household_id: string; sort_order: number; is_checked?: boolean }) {
+    const fullPayload = { ...payload, is_checked: payload.is_checked ?? false }
     const tempId = `temp-${Date.now()}`
-    const tempMeal: Meal = { ...payload, id: tempId, created_at: '', updated_at: '' }
+    const tempMeal: Meal = {
+      ...fullPayload,
+      id: tempId,
+      date: '',
+      meal_type: null,
+      notes: null,
+      created_by: '',
+      created_at: '',
+      updated_at: '',
+    }
     meals.value.push(tempMeal)
 
     try {
       const { data, error: insertError } = await supabase
         .from('meals')
-        .insert(payload)
+        .insert(fullPayload)
         .select()
         .single()
 
@@ -120,6 +109,29 @@ export const useMealsStore = defineStore('meals', () => {
     }
   }
 
+  async function toggleChecked(id: string) {
+    const meal = meals.value.find((m) => m.id === id)
+    if (!meal) return
+    await updateMeal(id, { is_checked: !meal.is_checked })
+  }
+
+  async function clearChecked() {
+    const checked = meals.value.filter((m) => m.is_checked)
+    if (!checked.length) return
+
+    const ids = checked.map((m) => m.id)
+    meals.value = meals.value.filter((m) => !m.is_checked)
+
+    try {
+      const { error: deleteError } = await supabase.from('meals').delete().in('id', ids)
+
+      if (deleteError) throw new Error(deleteError.message)
+    } catch (e) {
+      meals.value = [...meals.value, ...checked]
+      error.value = e instanceof Error ? e.message : 'Failed to clear checked meals'
+    }
+  }
+
   function subscribeRealtime() {
     const householdStore = useHouseholdStore()
     if (!householdStore.householdId) return
@@ -163,13 +175,12 @@ export const useMealsStore = defineStore('meals', () => {
     meals,
     loading,
     error,
-    selectedRange,
-    mealsByDate,
     fetchMeals,
-    setRange,
     addMeal,
     updateMeal,
     deleteMeal,
+    toggleChecked,
+    clearChecked,
     subscribeRealtime,
     unsubscribeRealtime,
   }
