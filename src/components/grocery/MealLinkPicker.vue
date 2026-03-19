@@ -21,35 +21,22 @@
       <div class="overflow-y-auto flex-1 p-4">
         <p v-if="!hasMeals" class="text-gray-500 text-center py-4">No meals available</p>
 
-        <template v-for="(dateMeals, date) in mealsByDate" :key="date">
-          <div class="mb-4">
-            <h3
-              data-testid="date-heading"
-              class="text-sm font-medium text-gray-600 mb-2"
-            >
-              {{ formatDate(date as string) }}
-            </h3>
-            <div
-              v-for="meal in dateMeals"
-              :key="meal.id"
-              class="flex items-center gap-2 py-1"
-            >
-              <input
-                :id="`meal-picker-${meal.id}`"
-                type="checkbox"
-                :checked="modelValue.includes(meal.id)"
-                class="w-4 h-4 cursor-pointer"
-                @change="toggleMeal(meal.id)"
-              />
-              <label :for="`meal-picker-${meal.id}`" class="cursor-pointer flex-1">
-                {{ meal.title }}
-                <span v-if="meal.meal_type" class="text-xs text-gray-500 ml-1">
-                  ({{ meal.meal_type }})
-                </span>
-              </label>
-            </div>
-          </div>
-        </template>
+        <div
+          v-for="meal in mealsStore.meals"
+          :key="meal.id"
+          class="flex items-center gap-2 py-1"
+        >
+          <input
+            :id="`meal-picker-${meal.id}`"
+            type="checkbox"
+            :checked="modelValue.includes(meal.id)"
+            class="w-4 h-4 cursor-pointer"
+            @change="toggleMeal(meal.id)"
+          />
+          <label :for="`meal-picker-${meal.id}`" class="cursor-pointer flex-1">
+            {{ meal.title }}
+          </label>
+        </div>
       </div>
 
       <!-- Footer -->
@@ -81,7 +68,6 @@ const emit = defineEmits<{
 
 const mealsStore = useMealsStore()
 
-const mealsByDate = computed(() => mealsStore.mealsByDate)
 const hasMeals = computed(() => mealsStore.meals.length > 0)
 
 function toggleMeal(mealId: string) {
@@ -93,10 +79,5 @@ function toggleMeal(mealId: string) {
     current.push(mealId)
   }
   emit('update:modelValue', current)
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 </script>
