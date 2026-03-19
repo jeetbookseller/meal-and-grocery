@@ -34,17 +34,15 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-secondary)">Section</label>
-            <select
-              v-model="sectionId"
-              data-testid="edit-section-select"
-              class="input"
+            <button
+              type="button"
+              data-testid="link-meals-btn"
+              class="btn-ghost w-full text-left min-h-[44px]"
               :disabled="loading"
+              @click="showMealPicker = true"
             >
-              <option v-for="section in groceryStore.sections" :key="section.id" :value="section.id">
-                {{ section.name }}
-              </option>
-            </select>
+              {{ selectedMealIds.length > 0 ? `Linked to ${selectedMealIds.length} meal(s)` : 'Link to meals...' }}
+            </button>
           </div>
 
           <p v-if="error" class="text-sm" style="color: var(--color-danger)">{{ error }}</p>
@@ -83,15 +81,24 @@
       </form>
     </div>
   </div>
+
+  <!-- Meal link picker -->
+  <MealLinkPicker
+    v-if="showMealPicker"
+    v-model="selectedMealIds"
+    @close="showMealPicker = false"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useGroceryStore } from '@/stores/grocery'
 import type { GroceryItem } from '@/types/database'
+import MealLinkPicker from '@/components/grocery/MealLinkPicker.vue'
 
 const props = defineProps<{
   item: GroceryItem
+  linkedMealIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -102,9 +109,10 @@ const groceryStore = useGroceryStore()
 
 const name = ref(props.item.name)
 const quantity = ref(props.item.quantity ?? '')
-const sectionId = ref(props.item.section_id)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const showMealPicker = ref(false)
+const selectedMealIds = ref<string[]>(props.linkedMealIds ? [...props.linkedMealIds] : [])
 
 async function handleSave() {
   if (!name.value.trim()) return
@@ -114,8 +122,8 @@ async function handleSave() {
     await groceryStore.updateItem(props.item.id, {
       name: name.value.trim(),
       quantity: quantity.value || null,
-      section_id: sectionId.value,
     })
+    await groceryStore.linkItemToMeals(props.item.id, selectedMealIds.value)
     emit('close')
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to save item'
