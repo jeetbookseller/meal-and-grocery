@@ -46,6 +46,7 @@
         v-for="item in sortedItems"
         :key="item.id"
         :item="item"
+        :linked-meals="groceryStore.itemMealLinks[item.id]"
         @edit="editingItem = $event"
         @delete="groceryStore.deleteItem($event.id)"
       />
@@ -60,6 +61,7 @@
     <GroceryItemEditModal
       v-if="editingItem"
       :item="editingItem"
+      :linked-meal-ids="(groceryStore.itemMealLinks[editingItem.id] ?? []).map(m => m.id)"
       @close="editingItem = null"
     />
   </div>
@@ -105,8 +107,9 @@ async function handleAddItem() {
   }
 }
 
-onMounted(() => {
-  groceryStore.fetchItems()
+onMounted(async () => {
+  await groceryStore.fetchItems()
+  groceryStore.fetchItemMealLinks()
   groceryStore.subscribeRealtime()
 })
 

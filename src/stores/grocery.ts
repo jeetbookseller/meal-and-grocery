@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useHouseholdStore } from '@/stores/household'
 import type { GrocerySection, GroceryItem } from '@/types/database'
@@ -9,10 +9,29 @@ export const useGroceryStore = defineStore('grocery', () => {
   const _sections = ref<GrocerySection[]>([])
 
   const items = ref<GroceryItem[]>([])
+  const itemLinks = ref<Array<{ grocery_item_id: string; meal_id: string; meals: { id: string; title: string } }>>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const itemMealLinks = computed(() => {
+    const map: Record<string, Array<{ id: string; title: string }>> = {}
+    for (const link of itemLinks.value) {
+      if (!map[link.grocery_item_id]) map[link.grocery_item_id] = []
+      map[link.grocery_item_id].push({ id: link.meals.id, title: link.meals.title })
+    }
+    return map
+  })
+
+  const mealGroceryCounts = computed(() => {
+    const map: Record<string, number> = {}
+    for (const link of itemLinks.value) {
+      map[link.meal_id] = (map[link.meal_id] || 0) + 1
+    }
+    return map
+  })
+
   let itemsChannel: ReturnType<typeof supabase.channel> | null = null
+  let linksChannel: ReturnType<typeof supabase.channel> | null = null
 
   async function _fetchSections() {
     const householdId = useHouseholdStore().householdId
@@ -55,6 +74,27 @@ export const useGroceryStore = defineStore('grocery', () => {
       error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to fetch items'
     } finally {
       loading.value = false
+    }
+  }
+
+  async function fetchItemMealLinks() {
+    const householdId = useHouseholdStore().householdId
+    if (!householdId) return
+    if (items.value.length === 0) {
+      itemLinks.value = []
+      return
+    }
+
+    try {
+      const itemIds = items.value.map(i => i.id)
+      const { data, error: fetchError } = await supabase
+        .from('grocery_item_meals')
+        .select('grocery_item_id, meal_id, meals(id, title)')
+        .in('grocery_item_id', itemIds)
+      if (fetchError) throw fetchError
+      itemLinks.value = data ?? []
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to fetch meal links'
     }
   }
 
@@ -153,6 +193,7 @@ export const useGroceryStore = defineStore('grocery', () => {
           .insert(mealIds.map(meal_id => ({ grocery_item_id: itemId, meal_id })))
         if (insertError) throw insertError
       }
+      await fetchItemMealLinks()
     } catch (e) {
       error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to link item to meals'
     }
@@ -181,6 +222,15 @@ export const useGroceryStore = defineStore('grocery', () => {
         }
       )
       .subscribe()
+
+    linksChannel = supabase
+      .channel('grocery-item-meals-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'grocery_item_meals' },
+        () => { fetchItemMealLinks() }
+      )
+      .subscribe()
   }
 
   async function unsubscribeRealtime() {
@@ -188,13 +238,20 @@ export const useGroceryStore = defineStore('grocery', () => {
       await supabase.removeChannel(itemsChannel)
       itemsChannel = null
     }
+    if (linksChannel) {
+      await supabase.removeChannel(linksChannel)
+      linksChannel = null
+    }
   }
 
   return {
     items,
+    itemMealLinks,
+    mealGroceryCounts,
     loading,
     error,
     fetchItems,
+    fetchItemMealLinks,
     addItem,
     updateItem,
     deleteItem,

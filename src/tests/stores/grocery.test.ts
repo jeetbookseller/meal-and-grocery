@@ -4,19 +4,20 @@ import { useGroceryStore } from '@/stores/grocery'
 
 // --- Supabase mock setup ---
 
-const mockQueryBuilder = {
+const mockQueryBuilder: Record<string, ReturnType<typeof vi.fn>> = {
   select: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
   eq: vi.fn(),
+  in: vi.fn(),
   order: vi.fn(),
   single: vi.fn(),
 }
 
 // Make every builder method return itself for chaining by default
 Object.keys(mockQueryBuilder).forEach(key => {
-  mockQueryBuilder[key as keyof typeof mockQueryBuilder].mockReturnValue(mockQueryBuilder)
+  mockQueryBuilder[key].mockReturnValue(mockQueryBuilder)
 })
 
 const { mockFrom, mockChannel, mockRemoveChannel } = vi.hoisted(() => ({
@@ -74,10 +75,10 @@ const mockUngroupedSection = {
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   // Reset all builder methods to return themselves
   Object.keys(mockQueryBuilder).forEach(key => {
-    mockQueryBuilder[key as keyof typeof mockQueryBuilder].mockReturnValue(mockQueryBuilder)
+    mockQueryBuilder[key].mockReturnValue(mockQueryBuilder)
   })
   mockFrom.mockReturnValue(mockQueryBuilder)
 })
@@ -251,9 +252,9 @@ describe('useGroceryStore', () => {
   // --- clearChecked ---
   describe('clearChecked()', () => {
     it('removes checked items from local state and calls DB delete', async () => {
-      const eqMock = vi.fn().mockReturnValueOnce(mockQueryBuilder).mockResolvedValueOnce({ error: null })
-      mockQueryBuilder.eq = eqMock
-      mockFrom.mockReturnValue(mockQueryBuilder)
+      mockQueryBuilder.eq
+        .mockReturnValueOnce(mockQueryBuilder)  // .eq('household_id', ...)
+        .mockResolvedValueOnce({ error: null })  // .eq('is_checked', true)
 
       const store = useGroceryStore()
       store.items = [mockItem, mockItem2] as any // mockItem2 is checked
@@ -267,11 +268,9 @@ describe('useGroceryStore', () => {
   // --- linkItemToMeals ---
   describe('linkItemToMeals()', () => {
     it('deletes existing links then inserts new ones', async () => {
-      const eqMock = vi.fn()
-        .mockResolvedValueOnce({ error: null }) // delete .eq()
-      mockQueryBuilder.eq = eqMock
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null }) // delete .eq()
       mockQueryBuilder.insert.mockResolvedValueOnce({ error: null })
-      mockFrom.mockReturnValue(mockQueryBuilder)
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: [], error: null }) // fetchItemMealLinks refetch
 
       const store = useGroceryStore()
       await store.linkItemToMeals('item-1', ['meal-1', 'meal-2'])
@@ -286,6 +285,7 @@ describe('useGroceryStore', () => {
 
     it('skips insert when mealIds is empty', async () => {
       mockQueryBuilder.eq.mockResolvedValueOnce({ error: null })
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: [], error: null }) // fetchItemMealLinks refetch
       const store = useGroceryStore()
       await store.linkItemToMeals('item-1', [])
       expect(mockQueryBuilder.insert).not.toHaveBeenCalled()
@@ -297,11 +297,27 @@ describe('useGroceryStore', () => {
       await store.linkItemToMeals('item-1', ['meal-1'])
       expect(store.error).toBe('Delete failed')
     })
+
+    it('refreshes item meal links after successful save', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null }) // delete .eq()
+      mockQueryBuilder.insert.mockResolvedValueOnce({ error: null })
+      // fetchItemMealLinks will call .in() at the end
+      const linkData = [
+        { grocery_item_id: 'item-1', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+      ]
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: linkData, error: null })
+
+      const store = useGroceryStore()
+      store.items = [mockItem] as any
+      await store.linkItemToMeals('item-1', ['meal-1'])
+
+      expect(store.itemMealLinks['item-1']).toEqual([{ id: 'meal-1', title: 'Pasta' }])
+    })
   })
 
   // --- subscribeRealtime ---
   describe('subscribeRealtime()', () => {
-    it('subscribes to only items channel (not sections)', () => {
+    it('subscribes to items and item-meals channels (not sections)', () => {
       const mockChannelInstance = {
         on: vi.fn().mockReturnThis(),
         subscribe: vi.fn().mockReturnThis(),
@@ -311,21 +327,26 @@ describe('useGroceryStore', () => {
       const store = useGroceryStore()
       store.subscribeRealtime()
 
-      expect(mockChannel).toHaveBeenCalledTimes(1)
+      expect(mockChannel).toHaveBeenCalledTimes(2)
       expect(mockChannel).toHaveBeenCalledWith('grocery-items-changes')
+      expect(mockChannel).toHaveBeenCalledWith('grocery-item-meals-changes')
       expect(mockChannel).not.toHaveBeenCalledWith('grocery-sections-changes')
     })
 
     it('handles INSERT event for items', () => {
       let itemCallback: (payload: any) => void = () => {}
-      const mockChannelInstance = {
-        on: vi.fn().mockImplementation((_event, _filter, cb) => {
-          itemCallback = cb
-          return mockChannelInstance
-        }),
-        subscribe: vi.fn().mockReturnThis(),
+      function makeCh(captureCb: boolean) {
+        const ch: Record<string, any> = {}
+        ch.on = vi.fn().mockImplementation((_event: any, _filter: any, cb: any) => {
+          if (captureCb) itemCallback = cb
+          return ch
+        })
+        ch.subscribe = vi.fn().mockReturnValue(ch)
+        return ch
       }
-      mockChannel.mockReturnValue(mockChannelInstance)
+      mockChannel
+        .mockReturnValueOnce(makeCh(true))   // grocery-items-changes
+        .mockReturnValueOnce(makeCh(false))   // grocery-item-meals-changes
 
       const store = useGroceryStore()
       store.subscribeRealtime()
@@ -336,14 +357,18 @@ describe('useGroceryStore', () => {
 
     it('handles UPDATE event for items', () => {
       let itemCallback: (payload: any) => void = () => {}
-      const mockChannelInstance = {
-        on: vi.fn().mockImplementation((_event, _filter, cb) => {
-          itemCallback = cb
-          return mockChannelInstance
-        }),
-        subscribe: vi.fn().mockReturnThis(),
+      function makeCh(captureCb: boolean) {
+        const ch: Record<string, any> = {}
+        ch.on = vi.fn().mockImplementation((_event: any, _filter: any, cb: any) => {
+          if (captureCb) itemCallback = cb
+          return ch
+        })
+        ch.subscribe = vi.fn().mockReturnValue(ch)
+        return ch
       }
-      mockChannel.mockReturnValue(mockChannelInstance)
+      mockChannel
+        .mockReturnValueOnce(makeCh(true))
+        .mockReturnValueOnce(makeCh(false))
 
       const store = useGroceryStore()
       store.items = [mockItem] as any
@@ -355,14 +380,18 @@ describe('useGroceryStore', () => {
 
     it('handles DELETE event for items', () => {
       let itemCallback: (payload: any) => void = () => {}
-      const mockChannelInstance = {
-        on: vi.fn().mockImplementation((_event, _filter, cb) => {
-          itemCallback = cb
-          return mockChannelInstance
-        }),
-        subscribe: vi.fn().mockReturnThis(),
+      function makeCh(captureCb: boolean) {
+        const ch: Record<string, any> = {}
+        ch.on = vi.fn().mockImplementation((_event: any, _filter: any, cb: any) => {
+          if (captureCb) itemCallback = cb
+          return ch
+        })
+        ch.subscribe = vi.fn().mockReturnValue(ch)
+        return ch
       }
-      mockChannel.mockReturnValue(mockChannelInstance)
+      mockChannel
+        .mockReturnValueOnce(makeCh(true))
+        .mockReturnValueOnce(makeCh(false))
 
       const store = useGroceryStore()
       store.items = [mockItem, mockItem2] as any
@@ -373,9 +402,75 @@ describe('useGroceryStore', () => {
     })
   })
 
+  // --- fetchItemMealLinks ---
+  describe('fetchItemMealLinks()', () => {
+    it('populates itemMealLinks map on success', async () => {
+      const linkData = [
+        { grocery_item_id: 'item-1', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+      ]
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: linkData, error: null })
+
+      const store = useGroceryStore()
+      store.items = [mockItem] as any
+      await store.fetchItemMealLinks()
+
+      expect(mockFrom).toHaveBeenCalledWith('grocery_item_meals')
+      expect(store.itemMealLinks['item-1']).toEqual([{ id: 'meal-1', title: 'Pasta' }])
+    })
+
+    it('groups multiple meals under the same item', async () => {
+      const linkData = [
+        { grocery_item_id: 'item-1', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+        { grocery_item_id: 'item-1', meal_id: 'meal-2', meals: { id: 'meal-2', title: 'Salad' } },
+      ]
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: linkData, error: null })
+
+      const store = useGroceryStore()
+      store.items = [mockItem] as any
+      await store.fetchItemMealLinks()
+
+      expect(store.itemMealLinks['item-1']).toHaveLength(2)
+    })
+
+    it('computes mealGroceryCounts from link data', async () => {
+      const linkData = [
+        { grocery_item_id: 'item-1', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+        { grocery_item_id: 'item-2', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+        { grocery_item_id: 'item-1', meal_id: 'meal-2', meals: { id: 'meal-2', title: 'Salad' } },
+      ]
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: linkData, error: null })
+
+      const store = useGroceryStore()
+      store.items = [mockItem, mockItem2] as any
+      await store.fetchItemMealLinks()
+
+      expect(store.mealGroceryCounts['meal-1']).toBe(2)
+      expect(store.mealGroceryCounts['meal-2']).toBe(1)
+    })
+
+    it('sets error on fetch failure', async () => {
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: null, error: { message: 'Link fetch failed' } })
+
+      const store = useGroceryStore()
+      store.items = [mockItem] as any
+      await store.fetchItemMealLinks()
+
+      expect(store.error).toBe('Link fetch failed')
+    })
+
+    it('skips fetch when items array is empty', async () => {
+      const store = useGroceryStore()
+      store.items = []
+      await store.fetchItemMealLinks()
+
+      // mockFrom is called in beforeEach setup, so check it wasn't called with grocery_item_meals
+      expect(mockFrom).not.toHaveBeenCalledWith('grocery_item_meals')
+    })
+  })
+
   // --- unsubscribeRealtime ---
   describe('unsubscribeRealtime()', () => {
-    it('calls removeChannel once (items channel only)', async () => {
+    it('calls removeChannel for both items and item-meals channels', async () => {
       const mockChannelInstance = {
         on: vi.fn().mockReturnThis(),
         subscribe: vi.fn().mockReturnThis(),
@@ -387,7 +482,7 @@ describe('useGroceryStore', () => {
       store.subscribeRealtime()
       await store.unsubscribeRealtime()
 
-      expect(mockRemoveChannel).toHaveBeenCalledTimes(1)
+      expect(mockRemoveChannel).toHaveBeenCalledTimes(2)
     })
   })
 })
