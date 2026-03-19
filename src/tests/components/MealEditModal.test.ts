@@ -4,13 +4,23 @@ import { setActivePinia, createPinia } from 'pinia'
 import type { Meal } from '@/types/database'
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
-const { mockUpdateMeal, mockMealsStore } = vi.hoisted(() => ({
+const { mockUpdateMeal, mockMealsStore, mockLinkMealToItems, mockGroceryStore } = vi.hoisted(() => ({
   mockUpdateMeal: vi.fn(),
   mockMealsStore: vi.fn(),
+  mockLinkMealToItems: vi.fn(),
+  mockGroceryStore: vi.fn(),
 }))
 
 vi.mock('@/stores/meals', () => ({
   useMealsStore: mockMealsStore,
+}))
+
+vi.mock('@/stores/grocery', () => ({
+  useGroceryStore: mockGroceryStore,
+}))
+
+vi.mock('@/components/grocery/GroceryLinkPicker.vue', () => ({
+  default: { template: '<div class="grocery-link-picker-stub" />', props: ['modelValue'] },
 }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -37,6 +47,12 @@ beforeEach(() => {
     updateMeal: mockUpdateMeal,
     loading: false,
     error: null,
+  })
+
+  mockLinkMealToItems.mockResolvedValue(undefined)
+  mockGroceryStore.mockReturnValue({
+    linkMealToItems: mockLinkMealToItems,
+    items: [],
   })
 })
 
@@ -148,5 +164,31 @@ describe('MealEditModal.vue', () => {
     expect(btn.attributes('disabled')).toBeDefined()
 
     resolveUpdate!()
+  })
+
+  it('renders a "Link to groceries..." button', async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find('[data-testid="link-groceries-btn"]').exists()).toBe(true)
+  })
+
+  it('shows linked count when linkedItemIds is provided', async () => {
+    const { default: MealEditModal } = await import('@/components/MealEditModal.vue')
+    const wrapper = mount(MealEditModal, {
+      props: { meal: mockMeal, linkedItemIds: ['item-1', 'item-2'] },
+      attachTo: document.body,
+    })
+    expect(wrapper.find('[data-testid="link-groceries-btn"]').text()).toContain('2')
+  })
+
+  it('calls groceryStore.linkMealToItems on submit', async () => {
+    mockUpdateMeal.mockResolvedValue(undefined)
+    const { default: MealEditModal } = await import('@/components/MealEditModal.vue')
+    const wrapper = mount(MealEditModal, {
+      props: { meal: mockMeal, linkedItemIds: ['item-1'] },
+      attachTo: document.body,
+    })
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+    expect(mockLinkMealToItems).toHaveBeenCalledWith('meal-1', ['item-1'])
   })
 })
