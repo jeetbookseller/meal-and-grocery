@@ -14,13 +14,6 @@
   --color-danger: #E03E3E;
   --color-hover-bg: #F4F4F2;
 
-  /* Meal type badge colors */
-  --color-breakfast-bg: #FFF3E0;
-  --color-breakfast-text: #C2410C;
-  --color-lunch-bg: #F0FDF4;
-  --color-lunch-text: #15803D;
-  --color-dinner-bg: #EFF6FF;
-  --color-dinner-text: #1D4ED8;
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
@@ -137,43 +130,6 @@
   .modal-leave-to {
     opacity: 0;
     transform: scale(0.95);
-  }
-
-  /* Meal type badges */
-  .badge-breakfast {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.125rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 9999px;
-    background-color: var(--color-breakfast-bg);
-    color: var(--color-breakfast-text);
-    text-transform: capitalize;
-  }
-
-  .badge-lunch {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.125rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 9999px;
-    background-color: var(--color-lunch-bg);
-    color: var(--color-lunch-text);
-    text-transform: capitalize;
-  }
-
-  .badge-dinner {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.125rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 9999px;
-    background-color: var(--color-dinner-bg);
-    color: var(--color-dinner-text);
-    text-transform: capitalize;
   }
 
   /* Navigation tab — active state */
