@@ -82,7 +82,9 @@ async function handleAdd() {
     await mealsStore.addMeal({
       title,
       household_id: householdStore.householdId,
-      sort_order: Date.now(),
+      sort_order: mealsStore.meals.length > 0
+        ? Math.max(...mealsStore.meals.map((m) => m.sort_order)) + 1
+        : 0,
     })
     newTitle.value = ''
   } finally {
