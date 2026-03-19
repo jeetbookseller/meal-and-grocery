@@ -20,6 +20,7 @@ export interface Meal {
   title: string
   notes: string | null
   sort_order: number
+  is_checked: boolean
   created_by: string
   created_at: string
   updated_at: string
