@@ -87,13 +87,13 @@ describe('MealLinkPicker', () => {
       expect(text).toContain('Pancakes')
     })
 
-    it('groups meals by date with a date heading', () => {
+    it('renders meals as a flat list (no date headings)', () => {
       const wrapper = mount(MealLinkPicker, {
         props: { modelValue: [] },
       })
-      // Should have two date headings for two different dates
+      // Flat list — no date grouping headings
       const headings = wrapper.findAll('[data-testid="date-heading"]')
-      expect(headings).toHaveLength(2)
+      expect(headings).toHaveLength(0)
     })
 
     it('shows "No meals available" when meals list is empty', () => {

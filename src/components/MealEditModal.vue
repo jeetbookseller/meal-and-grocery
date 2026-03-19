@@ -30,28 +30,6 @@
             />
           </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-primary)">Type</label>
-            <select
-              v-model="mealType"
-              class="input"
-            >
-              <option value="">— (no type)</option>
-              <option value="breakfast">Breakfast</option>
-              <option value="lunch">Lunch</option>
-              <option value="dinner">Dinner</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-primary)">Notes</label>
-            <textarea
-              v-model="notes"
-              rows="3"
-              class="input"
-            />
-          </div>
-
           <div class="flex justify-end gap-2">
             <button
               type="button"
@@ -76,7 +54,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Meal, MealType } from '@/types/database'
+import type { Meal } from '@/types/database'
 import { useMealsStore } from '@/stores/meals'
 
 const props = defineProps<{ meal: Meal }>()
@@ -85,18 +63,12 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 const mealsStore = useMealsStore()
 
 const title = ref(props.meal.title)
-const mealType = ref(props.meal.meal_type ?? '')
-const notes = ref(props.meal.notes ?? '')
 const isLoading = ref(false)
 
 async function handleSubmit() {
   isLoading.value = true
   try {
-    await mealsStore.updateMeal(props.meal.id, {
-      title: title.value,
-      meal_type: (mealType.value as MealType) || null,
-      notes: notes.value || null,
-    })
+    await mealsStore.updateMeal(props.meal.id, { title: title.value })
     if (!mealsStore.error) {
       emit('close')
     }

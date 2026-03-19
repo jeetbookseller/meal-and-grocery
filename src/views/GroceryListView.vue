@@ -54,7 +54,7 @@
     <!-- Bottom actions -->
     <div class="flex items-center gap-2 mt-4">
       <AddSectionButton />
-      <ClearCheckedButton />
+      <ClearCheckedButton @clear="groceryStore.clearChecked()" />
     </div>
 
     <!-- Item edit modal -->
