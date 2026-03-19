@@ -35,8 +35,12 @@ export const useMealsStore = defineStore('meals', () => {
     }
   }
 
-  async function addMeal(payload: { title: string; household_id: string; sort_order: number; is_checked?: boolean }) {
-    const fullPayload = { ...payload, is_checked: payload.is_checked ?? false }
+  async function addMeal(payload: { title: string; household_id: string; sort_order: number; is_checked?: boolean; date?: string }) {
+    const fullPayload = {
+      ...payload,
+      is_checked: payload.is_checked ?? false,
+      date: payload.date ?? new Date().toISOString().split('T')[0],
+    }
     const tempId = `temp-${Date.now()}`
     const tempMeal: Meal = {
       ...fullPayload,
