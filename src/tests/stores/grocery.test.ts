@@ -315,6 +315,75 @@ describe('useGroceryStore', () => {
     })
   })
 
+  // --- linkMealToItems ---
+  describe('linkMealToItems()', () => {
+    it('deletes existing links for meal then inserts new ones', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null }) // delete .eq()
+      mockQueryBuilder.insert.mockResolvedValueOnce({ error: null })
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: [], error: null }) // fetchItemMealLinks refetch
+
+      const store = useGroceryStore()
+      await store.linkMealToItems('meal-1', ['item-1', 'item-2'])
+
+      expect(mockFrom).toHaveBeenCalledWith('grocery_item_meals')
+      expect(mockQueryBuilder.delete).toHaveBeenCalled()
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('meal_id', 'meal-1')
+      expect(mockQueryBuilder.insert).toHaveBeenCalledWith([
+        { grocery_item_id: 'item-1', meal_id: 'meal-1' },
+        { grocery_item_id: 'item-2', meal_id: 'meal-1' },
+      ])
+    })
+
+    it('skips insert when itemIds is empty', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null })
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: [], error: null }) // fetchItemMealLinks refetch
+      const store = useGroceryStore()
+      await store.linkMealToItems('meal-1', [])
+      expect(mockQueryBuilder.insert).not.toHaveBeenCalled()
+    })
+
+    it('refreshes link data after successful save', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null })
+      mockQueryBuilder.insert.mockResolvedValueOnce({ error: null })
+      const linkData = [
+        { grocery_item_id: 'item-1', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+      ]
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: linkData, error: null })
+
+      const store = useGroceryStore()
+      store.items = [mockItem] as any
+      await store.linkMealToItems('meal-1', ['item-1'])
+
+      expect(store.itemMealLinks['item-1']).toEqual([{ id: 'meal-1', title: 'Pasta' }])
+    })
+
+    it('sets error on delete failure', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: { message: 'Delete failed' } })
+      const store = useGroceryStore()
+      await store.linkMealToItems('meal-1', ['item-1'])
+      expect(store.error).toBe('Delete failed')
+    })
+  })
+
+  // --- mealItemIds ---
+  describe('mealItemIds', () => {
+    it('computes item IDs grouped by meal from link data', async () => {
+      const linkData = [
+        { grocery_item_id: 'item-1', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+        { grocery_item_id: 'item-2', meal_id: 'meal-1', meals: { id: 'meal-1', title: 'Pasta' } },
+        { grocery_item_id: 'item-1', meal_id: 'meal-2', meals: { id: 'meal-2', title: 'Salad' } },
+      ]
+      mockQueryBuilder.in.mockResolvedValueOnce({ data: linkData, error: null })
+
+      const store = useGroceryStore()
+      store.items = [mockItem, mockItem2] as any
+      await store.fetchItemMealLinks()
+
+      expect(store.mealItemIds['meal-1']).toEqual(['item-1', 'item-2'])
+      expect(store.mealItemIds['meal-2']).toEqual(['item-1'])
+    })
+  })
+
   // --- subscribeRealtime ---
   describe('subscribeRealtime()', () => {
     it('subscribes to items and item-meals channels (not sections)', () => {

@@ -43,6 +43,7 @@
         :key="meal.id"
         :meal="meal"
         :linked-grocery-count="groceryStore.mealGroceryCounts[meal.id] ?? 0"
+        :linked-item-ids="groceryStore.mealItemIds[meal.id] ?? []"
       />
     </template>
 

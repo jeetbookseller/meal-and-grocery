@@ -30,6 +30,15 @@ export const useGroceryStore = defineStore('grocery', () => {
     return map
   })
 
+  const mealItemIds = computed(() => {
+    const map: Record<string, string[]> = {}
+    for (const link of itemLinks.value) {
+      if (!map[link.meal_id]) map[link.meal_id] = []
+      map[link.meal_id].push(link.grocery_item_id)
+    }
+    return map
+  })
+
   let itemsChannel: ReturnType<typeof supabase.channel> | null = null
   let linksChannel: ReturnType<typeof supabase.channel> | null = null
 
@@ -199,6 +208,27 @@ export const useGroceryStore = defineStore('grocery', () => {
     }
   }
 
+  async function linkMealToItems(mealId: string, itemIds: string[]) {
+    error.value = null
+    try {
+      const { error: deleteError } = await supabase
+        .from('grocery_item_meals')
+        .delete()
+        .eq('meal_id', mealId)
+      if (deleteError) throw deleteError
+
+      if (itemIds.length > 0) {
+        const { error: insertError } = await supabase
+          .from('grocery_item_meals')
+          .insert(itemIds.map(grocery_item_id => ({ grocery_item_id, meal_id: mealId })))
+        if (insertError) throw insertError
+      }
+      await fetchItemMealLinks()
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to link meal to items'
+    }
+  }
+
   function subscribeRealtime() {
     const householdId = useHouseholdStore().householdId
     if (!householdId) return
@@ -248,6 +278,7 @@ export const useGroceryStore = defineStore('grocery', () => {
     items,
     itemMealLinks,
     mealGroceryCounts,
+    mealItemIds,
     loading,
     error,
     fetchItems,
@@ -258,6 +289,7 @@ export const useGroceryStore = defineStore('grocery', () => {
     toggleChecked,
     clearChecked,
     linkItemToMeals,
+    linkMealToItems,
     subscribeRealtime,
     unsubscribeRealtime,
   }

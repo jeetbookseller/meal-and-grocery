@@ -60,7 +60,7 @@
     </button>
 
     <!-- Edit modal -->
-    <MealEditModal v-if="showEdit" :meal="meal" @close="showEdit = false" />
+    <MealEditModal v-if="showEdit" :meal="meal" :linked-item-ids="linkedItemIds" @close="showEdit = false" />
   </div>
 </template>
 
@@ -73,6 +73,7 @@ import MealEditModal from '@/components/MealEditModal.vue'
 const props = defineProps<{
   meal: Meal
   linkedGroceryCount?: number
+  linkedItemIds?: string[]
 }>()
 
 const mealsStore = useMealsStore()
