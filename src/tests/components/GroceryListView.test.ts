@@ -2,12 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 
-// --- Mock state (plain reactive object for correct template access) ---
+// --- Mock state ---
 const { mockState } = vi.hoisted(() => {
-  const sections = [
-    { id: 'sec-1', household_id: 'hh-1', name: 'Produce', sort_order: 0, is_default: true },
-    { id: 'sec-2', household_id: 'hh-1', name: 'Dairy', sort_order: 1, is_default: false },
-  ]
   const items = [
     {
       id: 'item-1',
@@ -20,24 +16,29 @@ const { mockState } = vi.hoisted(() => {
       created_by: 'user-1',
       created_at: '2026-03-16T00:00:00Z',
     },
+    {
+      id: 'item-2',
+      household_id: 'hh-1',
+      section_id: 'sec-1',
+      name: 'Milk',
+      quantity: null,
+      is_checked: true,
+      sort_order: 1,
+      created_by: 'user-1',
+      created_at: '2026-03-16T00:00:00Z',
+    },
   ]
   return {
     mockState: {
-      sections,
       items,
       loading: false,
       error: null as string | null,
-      itemsBySection: { 'sec-1': items } as Record<string, typeof items>,
-      fetchSections: vi.fn().mockResolvedValue(undefined),
       fetchItems: vi.fn().mockResolvedValue(undefined),
       subscribeRealtime: vi.fn(),
       unsubscribeRealtime: vi.fn(),
-      ensureUngroupedSection: vi.fn().mockResolvedValue(undefined),
-      ungroupedSection: { id: 'sec-1', name: 'Ungrouped' },
+      addItem: vi.fn().mockResolvedValue(undefined),
+      deleteItem: vi.fn().mockResolvedValue(undefined),
       clearChecked: vi.fn(),
-      addSection: vi.fn(),
-      renameSection: vi.fn(),
-      deleteSection: vi.fn(),
       toggleChecked: vi.fn(),
     },
   }
@@ -47,12 +48,12 @@ vi.mock('@/stores/grocery', () => ({
   useGroceryStore: vi.fn(() => mockState),
 }))
 
+vi.mock('@/stores/household', () => ({
+  useHouseholdStore: vi.fn(() => ({ householdId: 'hh-1' })),
+}))
+
 import GroceryListView from '@/views/GroceryListView.vue'
 
-const defaultSections = [
-  { id: 'sec-1', household_id: 'hh-1', name: 'Produce', sort_order: 0, is_default: true },
-  { id: 'sec-2', household_id: 'hh-1', name: 'Dairy', sort_order: 1, is_default: false },
-]
 const defaultItems = [
   {
     id: 'item-1',
@@ -65,22 +66,26 @@ const defaultItems = [
     created_by: 'user-1',
     created_at: '2026-03-16T00:00:00Z',
   },
+  {
+    id: 'item-2',
+    household_id: 'hh-1',
+    section_id: 'sec-1',
+    name: 'Milk',
+    quantity: null,
+    is_checked: true,
+    sort_order: 1,
+    created_by: 'user-1',
+    created_at: '2026-03-16T00:00:00Z',
+  },
 ]
 
 describe('GroceryListView.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    mockState.sections = [...defaultSections]
     mockState.items = [...defaultItems]
     mockState.loading = false
     mockState.error = null
-    mockState.itemsBySection = { 'sec-1': [...defaultItems] }
-  })
-
-  it('calls fetchSections on mount', () => {
-    mount(GroceryListView)
-    expect(mockState.fetchSections).toHaveBeenCalledOnce()
   })
 
   it('calls fetchItems on mount', () => {
@@ -99,21 +104,32 @@ describe('GroceryListView.vue', () => {
     expect(mockState.unsubscribeRealtime).toHaveBeenCalledOnce()
   })
 
-  it('renders one GrocerySection per section', () => {
-    const wrapper = mount(GroceryListView)
-    const sections = wrapper.findAll('[data-testid="grocery-section"]')
-    expect(sections).toHaveLength(2)
+  it('does NOT call fetchSections (no longer needed)', () => {
+    mount(GroceryListView)
+    // grocery store no longer exposes fetchSections
+    expect(mockState).not.toHaveProperty('fetchSections')
   })
 
-  it('renders section names', () => {
+  it('renders GroceryItem for each item', () => {
     const wrapper = mount(GroceryListView)
-    expect(wrapper.text()).toContain('Produce')
-    expect(wrapper.text()).toContain('Dairy')
+    const items = wrapper.findAll('[data-testid="grocery-item"]')
+    expect(items).toHaveLength(2)
   })
 
-  it('renders AddSectionButton', () => {
+  it('renders item names in the flat list', () => {
     const wrapper = mount(GroceryListView)
-    expect(wrapper.find('[data-testid="add-section-btn"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Apples')
+    expect(wrapper.text()).toContain('Milk')
+  })
+
+  it('does NOT render AddSectionButton', () => {
+    const wrapper = mount(GroceryListView)
+    expect(wrapper.find('[data-testid="add-section-btn"]').exists()).toBe(false)
+  })
+
+  it('does NOT render GrocerySection', () => {
+    const wrapper = mount(GroceryListView)
+    expect(wrapper.find('[data-testid="grocery-section"]').exists()).toBe(false)
   })
 
   it('renders ClearCheckedButton', () => {
@@ -127,21 +143,53 @@ describe('GroceryListView.vue', () => {
     expect(wrapper.find('[data-testid="loading-spinner"]').exists()).toBe(true)
   })
 
-  it('hides sections when loading', () => {
+  it('hides items when loading', () => {
     mockState.loading = true
     const wrapper = mount(GroceryListView)
-    expect(wrapper.find('[data-testid="grocery-section"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="grocery-item"]').exists()).toBe(false)
   })
 
   it('shows error message when error is set', () => {
+    mockState.loading = false
     mockState.error = 'Failed to load'
     const wrapper = mount(GroceryListView)
     expect(wrapper.text()).toContain('Failed to load')
   })
 
-  it('shows empty state when no sections', () => {
-    mockState.sections = []
+  it('shows empty state when no items', () => {
+    mockState.items = []
     const wrapper = mount(GroceryListView)
     expect(wrapper.find('[data-testid="empty-state"]').exists()).toBe(true)
+  })
+
+  it('unchecked items render before checked items', () => {
+    const wrapper = mount(GroceryListView)
+    const items = wrapper.findAll('[data-testid="grocery-item"]')
+    // First item should be Apples (unchecked), second Milk (checked)
+    expect(items[0].text()).toContain('Apples')
+    expect(items[1].text()).toContain('Milk')
+  })
+
+  it('renders add input and button', () => {
+    const wrapper = mount(GroceryListView)
+    expect(wrapper.find('[data-testid="global-add-input"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="global-add-btn"]').exists()).toBe(true)
+  })
+
+  it('calls addItem when form is submitted with a name', async () => {
+    const wrapper = mount(GroceryListView)
+    await wrapper.find('[data-testid="global-add-input"]').setValue('Bananas')
+    await wrapper.find('form').trigger('submit')
+    expect(mockState.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Bananas', household_id: 'hh-1' })
+    )
+  })
+
+  it('clears input after successful add', async () => {
+    const wrapper = mount(GroceryListView)
+    await wrapper.find('[data-testid="global-add-input"]').setValue('Bananas')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+    expect((wrapper.find('[data-testid="global-add-input"]').element as HTMLInputElement).value).toBe('')
   })
 })

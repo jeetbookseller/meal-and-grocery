@@ -10,13 +10,13 @@
         type="text"
         placeholder="Add to list..."
         class="input flex-1"
-        :disabled="addingItem || !groceryStore.ungroupedSection"
+        :disabled="addingItem"
       />
       <button
         type="submit"
         data-testid="global-add-btn"
         class="btn-primary"
-        :disabled="addingItem || !newItemName.trim() || !groceryStore.ungroupedSection"
+        :disabled="addingItem || !newItemName.trim()"
       >
         {{ addingItem ? 'Adding...' : 'Add' }}
       </button>
@@ -32,7 +32,7 @@
 
     <!-- Empty state -->
     <div
-      v-else-if="groceryStore.sections.length === 0"
+      v-else-if="groceryStore.items.length === 0"
       data-testid="empty-state"
       class="py-12 text-center text-gray-400"
     >
@@ -40,20 +40,19 @@
       <p class="text-sm">Add an item above to get started.</p>
     </div>
 
-    <!-- Sections -->
+    <!-- Flat item list -->
     <template v-else>
-      <GrocerySection
-        v-for="section in sortedSections"
-        :key="section.id"
-        :section="section"
-        :items="groceryStore.itemsBySection[section.id] ?? []"
+      <GroceryItem
+        v-for="item in sortedItems"
+        :key="item.id"
+        :item="item"
         @edit="editingItem = $event"
+        @delete="groceryStore.deleteItem($event.id)"
       />
     </template>
 
     <!-- Bottom actions -->
     <div class="flex items-center gap-2 mt-4">
-      <AddSectionButton />
       <ClearCheckedButton @clear="groceryStore.clearChecked()" />
     </div>
 
@@ -70,9 +69,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGroceryStore } from '@/stores/grocery'
 import { useHouseholdStore } from '@/stores/household'
-import type { GroceryItem } from '@/types/database'
-import GrocerySection from '@/components/GrocerySection.vue'
-import AddSectionButton from '@/components/AddSectionButton.vue'
+import type { GroceryItem as GroceryItemType } from '@/types/database'
+import GroceryItem from '@/components/GroceryItem.vue'
 import ClearCheckedButton from '@/components/ClearCheckedButton.vue'
 import BaseSpinner from '@/components/base/BaseSpinner.vue'
 import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
@@ -83,24 +81,22 @@ const householdStore = useHouseholdStore()
 
 const newItemName = ref('')
 const addingItem = ref(false)
-const editingItem = ref<GroceryItem | null>(null)
+const editingItem = ref<GroceryItemType | null>(null)
 
-const sortedSections = computed(() =>
-  [...groceryStore.sections].sort((a, b) => {
-    if (a.name === 'Ungrouped') return -1
-    if (b.name === 'Ungrouped') return 1
+const sortedItems = computed(() =>
+  [...groceryStore.items].sort((a, b) => {
+    if (a.is_checked !== b.is_checked) return a.is_checked ? 1 : -1
     return a.sort_order - b.sort_order
   })
 )
 
 async function handleAddItem() {
   const name = newItemName.value.trim()
-  if (!name || !groceryStore.ungroupedSection || !householdStore.householdId) return
+  if (!name || !householdStore.householdId) return
   addingItem.value = true
   try {
     await groceryStore.addItem({
       name,
-      section_id: groceryStore.ungroupedSection.id,
       household_id: householdStore.householdId,
     })
     newItemName.value = ''
@@ -110,7 +106,6 @@ async function handleAddItem() {
 }
 
 onMounted(() => {
-  groceryStore.fetchSections().then(() => groceryStore.ensureUngroupedSection())
   groceryStore.fetchItems()
   groceryStore.subscribeRealtime()
 })

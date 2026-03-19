@@ -5,14 +5,19 @@ import { setActivePinia, createPinia } from 'pinia'
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
 const mockUpdateItem = vi.fn()
 const mockDeleteItem = vi.fn()
+const mockLinkItemToMeals = vi.fn()
 
 vi.mock('@/stores/grocery', () => ({
   useGroceryStore: vi.fn(() => ({
     updateItem: mockUpdateItem,
     deleteItem: mockDeleteItem,
-    sections: [
-      { id: 'sec-1', name: 'Produce', household_id: 'hh-1', sort_order: 0, is_default: true },
-    ],
+    linkItemToMeals: mockLinkItemToMeals,
+  })),
+}))
+
+vi.mock('@/stores/meals', () => ({
+  useMealsStore: vi.fn(() => ({
+    meals: [],
   })),
 }))
 
@@ -56,15 +61,36 @@ describe('GroceryItemEditModal.vue', () => {
     expect((input.element as HTMLInputElement).value).toBe('6')
   })
 
+  it('does NOT render section dropdown', () => {
+    const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
+    expect(wrapper.find('[data-testid="edit-section-select"]').exists()).toBe(false)
+  })
+
+  it('renders link meals button', () => {
+    const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
+    expect(wrapper.find('[data-testid="link-meals-btn"]').exists()).toBe(true)
+  })
+
   it('calls groceryStore.updateItem on form submit', async () => {
     mockUpdateItem.mockResolvedValue(undefined)
+    mockLinkItemToMeals.mockResolvedValue(undefined)
     const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
     await wrapper.find('form').trigger('submit')
     expect(mockUpdateItem).toHaveBeenCalledWith('item-1', expect.objectContaining({ name: 'Apples' }))
   })
 
+  it('calls groceryStore.linkItemToMeals on save', async () => {
+    mockUpdateItem.mockResolvedValue(undefined)
+    mockLinkItemToMeals.mockResolvedValue(undefined)
+    const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem, linkedMealIds: ['meal-1'] } })
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+    expect(mockLinkItemToMeals).toHaveBeenCalledWith('item-1', ['meal-1'])
+  })
+
   it('emits close after successful save', async () => {
     mockUpdateItem.mockResolvedValue(undefined)
+    mockLinkItemToMeals.mockResolvedValue(undefined)
     const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
     await wrapper.find('form').trigger('submit')
     await wrapper.vm.$nextTick()

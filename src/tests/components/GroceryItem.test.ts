@@ -45,7 +45,6 @@ describe('GroceryItem.vue', () => {
   it('does not render quantity when null', () => {
     const item = { ...baseItem, quantity: null }
     const wrapper = mount(GroceryItem, { props: { item } })
-    // text should not contain a quantity element
     expect(wrapper.find('[data-testid="item-quantity"]').exists()).toBe(false)
   })
 
@@ -92,6 +91,29 @@ describe('GroceryItem.vue', () => {
     const wrapper = mount(GroceryItem, { props: { item: baseItem } })
     await wrapper.find('[data-testid="edit-item-btn"]').trigger('click')
     expect(wrapper.emitted('edit')).toBeTruthy()
+  })
+
+  // ─── Delete button ───────────────────────────────────────────────────────────
+  it('renders delete icon button', () => {
+    const wrapper = mount(GroceryItem, { props: { item: baseItem } })
+    expect(wrapper.find('[data-testid="delete-item-btn"]').exists()).toBe(true)
+  })
+
+  it('emits delete event when delete button is clicked', async () => {
+    const wrapper = mount(GroceryItem, { props: { item: baseItem } })
+    await wrapper.find('[data-testid="delete-item-btn"]').trigger('click')
+    expect(wrapper.emitted('delete')).toBeTruthy()
+    expect(wrapper.emitted('delete')![0]).toEqual([baseItem])
+  })
+
+  it('delete button has min-h-[44px] touch target', () => {
+    const wrapper = mount(GroceryItem, { props: { item: baseItem } })
+    expect(wrapper.find('[data-testid="delete-item-btn"]').classes()).toContain('min-h-[44px]')
+  })
+
+  it('delete button has min-w-[44px] touch target', () => {
+    const wrapper = mount(GroceryItem, { props: { item: baseItem } })
+    expect(wrapper.find('[data-testid="delete-item-btn"]').classes()).toContain('min-w-[44px]')
   })
 
   // ─── Mobile responsiveness: touch targets ───────────────────────────────────
