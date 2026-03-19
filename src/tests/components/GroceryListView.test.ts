@@ -40,6 +40,9 @@ const { mockState } = vi.hoisted(() => {
       deleteItem: vi.fn().mockResolvedValue(undefined),
       clearChecked: vi.fn(),
       toggleChecked: vi.fn(),
+      fetchItemMealLinks: vi.fn().mockResolvedValue(undefined),
+      itemMealLinks: {} as Record<string, Array<{ id: string; title: string }>>,
+      mealGroceryCounts: {} as Record<string, number>,
     },
   }
 })
@@ -93,8 +96,9 @@ describe('GroceryListView.vue', () => {
     expect(mockState.fetchItems).toHaveBeenCalledOnce()
   })
 
-  it('calls subscribeRealtime on mount', () => {
+  it('calls subscribeRealtime on mount', async () => {
     mount(GroceryListView)
+    await vi.dynamicImportSettled()
     expect(mockState.subscribeRealtime).toHaveBeenCalledOnce()
   })
 

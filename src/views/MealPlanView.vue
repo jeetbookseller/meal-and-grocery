@@ -42,7 +42,7 @@
         v-for="meal in sortedMeals"
         :key="meal.id"
         :meal="meal"
-        :linked-grocery-count="0"
+        :linked-grocery-count="groceryStore.mealGroceryCounts[meal.id] ?? 0"
       />
     </template>
 
@@ -56,6 +56,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMealsStore } from '@/stores/meals'
+import { useGroceryStore } from '@/stores/grocery'
 import { useHouseholdStore } from '@/stores/household'
 import MealRow from '@/components/MealRow.vue'
 import ClearCheckedButton from '@/components/ClearCheckedButton.vue'
@@ -63,6 +64,7 @@ import BaseSpinner from '@/components/base/BaseSpinner.vue'
 import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
 
 const mealsStore = useMealsStore()
+const groceryStore = useGroceryStore()
 const householdStore = useHouseholdStore()
 
 const newTitle = ref('')
@@ -92,9 +94,11 @@ async function handleAdd() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   mealsStore.fetchMeals()
   mealsStore.subscribeRealtime()
+  await groceryStore.fetchItems()
+  groceryStore.fetchItemMealLinks()
 })
 
 onUnmounted(() => {
