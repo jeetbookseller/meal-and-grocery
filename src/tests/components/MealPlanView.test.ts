@@ -26,6 +26,8 @@ const {
     unsubscribeRealtime: mockUnsubscribeRealtime,
     addMeal: mockAddMeal,
     clearChecked: mockClearChecked,
+    mealTypeOptions: [] as string[],
+    groupedMeals: [] as { type: string | null; label: string; meals: Meal[] }[],
   }
   return {
     mockFetchMeals,
@@ -43,6 +45,15 @@ vi.mock('@/stores/meals', () => ({
 
 vi.mock('@/stores/household', () => ({
   useHouseholdStore: () => ({ householdId: 'hh-1' }),
+}))
+
+vi.mock('@/stores/grocery', () => ({
+  useGroceryStore: () => ({
+    fetchItems: vi.fn().mockResolvedValue(undefined),
+    fetchItemMealLinks: vi.fn(),
+    mealGroceryCounts: {} as Record<string, number>,
+    mealItemIds: {} as Record<string, string[]>,
+  }),
 }))
 
 // Stub child components
@@ -190,5 +201,80 @@ describe('MealPlanView', () => {
     const wrapper = mount(MealPlanView)
     await wrapper.find('.clear-checked-stub').trigger('click')
     expect(mockClearChecked).toHaveBeenCalledOnce()
+  })
+
+  it('renders a group-by-type toggle button with data-testid="group-by-type-toggle"', () => {
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('[data-testid="group-by-type-toggle"]').exists()).toBe(true)
+  })
+
+  it('toggle button has btn-ghost class', () => {
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('[data-testid="group-by-type-toggle"]').classes()).toContain('btn-ghost')
+  })
+
+  it('clicking toggle switches from flat to grouped view', async () => {
+    mockStoreState.meals = [makeMeal({ id: 'meal-1', meal_type: 'Breakfast' })]
+    mockStoreState.groupedMeals = [
+      { type: 'breakfast', label: 'Breakfast', meals: [makeMeal({ id: 'meal-1', meal_type: 'Breakfast' })] },
+    ]
+    const wrapper = mount(MealPlanView)
+    // Before toggle: flat list is shown (no headers)
+    expect(wrapper.find('[data-testid="meal-group-header"]').exists()).toBe(false)
+    // Toggle on
+    await wrapper.find('[data-testid="group-by-type-toggle"]').trigger('click')
+    expect(wrapper.find('[data-testid="meal-group-header"]').exists()).toBe(true)
+  })
+
+  it('clicking toggle twice switches back to flat view', async () => {
+    mockStoreState.meals = [makeMeal({ id: 'meal-1', meal_type: 'Breakfast' })]
+    mockStoreState.groupedMeals = [
+      { type: 'breakfast', label: 'Breakfast', meals: [makeMeal({ id: 'meal-1', meal_type: 'Breakfast' })] },
+    ]
+    const wrapper = mount(MealPlanView)
+    await wrapper.find('[data-testid="group-by-type-toggle"]').trigger('click')
+    await wrapper.find('[data-testid="group-by-type-toggle"]').trigger('click')
+    expect(wrapper.find('[data-testid="meal-group-header"]').exists()).toBe(false)
+  })
+
+  it('grouped view renders a section header for each group', async () => {
+    mockStoreState.meals = [
+      makeMeal({ id: 'meal-1', meal_type: 'Breakfast' }),
+      makeMeal({ id: 'meal-2', meal_type: 'Dinner' }),
+    ]
+    mockStoreState.groupedMeals = [
+      { type: 'breakfast', label: 'Breakfast', meals: [makeMeal({ id: 'meal-1', meal_type: 'Breakfast' })] },
+      { type: 'dinner', label: 'Dinner', meals: [makeMeal({ id: 'meal-2', meal_type: 'Dinner' })] },
+    ]
+    const wrapper = mount(MealPlanView)
+    await wrapper.find('[data-testid="group-by-type-toggle"]').trigger('click')
+    const headers = wrapper.findAll('[data-testid="meal-group-header"]')
+    expect(headers.length).toBe(2)
+    expect(headers[0].text()).toBe('Breakfast')
+    expect(headers[1].text()).toBe('Dinner')
+  })
+
+  it('add form includes meal type input with data-testid="add-meal-type-input"', () => {
+    const wrapper = mount(MealPlanView)
+    expect(wrapper.find('[data-testid="add-meal-type-input"]').exists()).toBe(true)
+  })
+
+  it('submitting form passes meal_type to addMeal', async () => {
+    const wrapper = mount(MealPlanView)
+    await wrapper.find('[data-testid="add-meal-input"]').setValue('Tacos')
+    await wrapper.find('[data-testid="add-meal-type-input"]').setValue('Dinner')
+    await wrapper.find('form').trigger('submit')
+    expect(mockAddMeal).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Tacos', meal_type: 'Dinner' })
+    )
+  })
+
+  it('submitting form passes null meal_type when type input is empty', async () => {
+    const wrapper = mount(MealPlanView)
+    await wrapper.find('[data-testid="add-meal-input"]').setValue('Tacos')
+    await wrapper.find('form').trigger('submit')
+    expect(mockAddMeal).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Tacos', meal_type: null })
+    )
   })
 })

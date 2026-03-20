@@ -47,6 +47,7 @@ beforeEach(() => {
     updateMeal: mockUpdateMeal,
     loading: false,
     error: null,
+    mealTypeOptions: [] as string[],
   })
 
   mockLinkMealToItems.mockResolvedValue(undefined)
@@ -122,7 +123,7 @@ describe('MealEditModal.vue', () => {
     await wrapper.find('input[type="text"]').setValue('Updated Pasta')
     await wrapper.find('form').trigger('submit')
     await wrapper.vm.$nextTick()
-    expect(mockUpdateMeal).toHaveBeenCalledWith('meal-1', { title: 'Updated Pasta' })
+    expect(mockUpdateMeal).toHaveBeenCalledWith('meal-1', expect.objectContaining({ title: 'Updated Pasta' }))
   })
 
   it('emits close after successful updateMeal', async () => {
@@ -190,5 +191,51 @@ describe('MealEditModal.vue', () => {
     await wrapper.find('form').trigger('submit')
     await wrapper.vm.$nextTick()
     expect(mockLinkMealToItems).toHaveBeenCalledWith('meal-1', ['item-1'])
+  })
+
+  it('meal type input exists with data-testid="meal-type-input"', async () => {
+    const wrapper = await mountComponent()
+    expect(wrapper.find('[data-testid="meal-type-input"]').exists()).toBe(true)
+  })
+
+  it('meal type input is pre-filled with the meal meal_type', async () => {
+    const mealWithType = { ...mockMeal, meal_type: 'Brunch' }
+    const { default: MealEditModal } = await import('@/components/MealEditModal.vue')
+    const wrapper = mount(MealEditModal, { props: { meal: mealWithType }, attachTo: document.body })
+    const input = wrapper.find('[data-testid="meal-type-input"]')
+    expect((input.element as HTMLInputElement).value).toBe('Brunch')
+  })
+
+  it('meal type input is empty when meal_type is null', async () => {
+    const wrapper = await mountComponent()
+    const input = wrapper.find('[data-testid="meal-type-input"]')
+    expect((input.element as HTMLInputElement).value).toBe('')
+  })
+
+  it('changing meal type and saving calls updateMeal with new meal_type', async () => {
+    mockUpdateMeal.mockResolvedValue(undefined)
+    const wrapper = await mountComponent()
+    await wrapper.find('[data-testid="meal-type-input"]').setValue('Dessert')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+    expect(mockUpdateMeal).toHaveBeenCalledWith('meal-1', expect.objectContaining({ meal_type: 'Dessert' }))
+  })
+
+  it('empty meal type input sends meal_type: null', async () => {
+    mockUpdateMeal.mockResolvedValue(undefined)
+    const wrapper = await mountComponent()
+    await wrapper.find('[data-testid="meal-type-input"]').setValue('')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+    expect(mockUpdateMeal).toHaveBeenCalledWith('meal-1', expect.objectContaining({ meal_type: null }))
+  })
+
+  it('whitespace-only meal type input sends meal_type: null', async () => {
+    mockUpdateMeal.mockResolvedValue(undefined)
+    const wrapper = await mountComponent()
+    await wrapper.find('[data-testid="meal-type-input"]').setValue('   ')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+    expect(mockUpdateMeal).toHaveBeenCalledWith('meal-1', expect.objectContaining({ meal_type: null }))
   })
 })

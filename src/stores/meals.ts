@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Meal } from '@/types/database'
 import { supabase } from '@/lib/supabase'
@@ -35,7 +35,7 @@ export const useMealsStore = defineStore('meals', () => {
     }
   }
 
-  async function addMeal(payload: { title: string; household_id: string; sort_order: number; is_checked?: boolean; date?: string }) {
+  async function addMeal(payload: { title: string; household_id: string; sort_order: number; is_checked?: boolean; date?: string; meal_type?: string | null }) {
     const fullPayload = {
       ...payload,
       is_checked: payload.is_checked ?? false,
@@ -46,7 +46,7 @@ export const useMealsStore = defineStore('meals', () => {
       ...fullPayload,
       id: tempId,
       date: '',
-      meal_type: null,
+      meal_type: payload.meal_type ?? null,
       notes: null,
       created_by: '',
       created_at: '',
@@ -136,6 +136,41 @@ export const useMealsStore = defineStore('meals', () => {
     }
   }
 
+  const mealTypeOptions = computed(() => {
+    const seen = new Map<string, string>()
+    for (const meal of meals.value) {
+      if (meal.meal_type) {
+        const lower = meal.meal_type.toLowerCase()
+        if (!seen.has(lower)) seen.set(lower, meal.meal_type)
+      }
+    }
+    return [...seen.values()].sort()
+  })
+
+  const groupedMeals = computed(() => {
+    const groupMap = new Map<string, { label: string; meals: Meal[] }>()
+    for (const meal of meals.value) {
+      const key = meal.meal_type ? meal.meal_type.toLowerCase() : '__null__'
+      const label = key === '__null__' ? 'Other' : (groupMap.get(key)?.label ?? meal.meal_type!)
+      if (!groupMap.has(key)) groupMap.set(key, { label, meals: [] })
+      groupMap.get(key)!.meals.push(meal)
+    }
+    return [...groupMap.entries()]
+      .map(([key, { label, meals: gm }]) => ({
+        type: key === '__null__' ? null : (key as string),
+        label,
+        meals: [
+          ...gm.filter((m) => !m.is_checked).sort((a, b) => a.sort_order - b.sort_order),
+          ...gm.filter((m) => m.is_checked).sort((a, b) => a.sort_order - b.sort_order),
+        ],
+      }))
+      .sort((a, b) => {
+        if (a.type === null) return 1
+        if (b.type === null) return -1
+        return a.label.toLowerCase().localeCompare(b.label.toLowerCase())
+      })
+  })
+
   function subscribeRealtime() {
     const householdStore = useHouseholdStore()
     if (!householdStore.householdId) return
@@ -179,6 +214,8 @@ export const useMealsStore = defineStore('meals', () => {
     meals,
     loading,
     error,
+    mealTypeOptions,
+    groupedMeals,
     fetchMeals,
     addMeal,
     updateMeal,

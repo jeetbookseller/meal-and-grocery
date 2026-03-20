@@ -386,6 +386,144 @@ describe('useMealsStore', () => {
     })
   })
 
+  describe('groupedMeals', () => {
+    it('groups meals by meal_type, null group labeled "Other" sorted last', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'Dinner', is_checked: false, sort_order: 0 },
+        { ...mockMeal, id: 'm2', meal_type: null, is_checked: false, sort_order: 1 },
+      ]
+      const groups = store.groupedMeals
+      expect(groups[0].label).toBe('Dinner')
+      expect(groups[1].label).toBe('Other')
+      expect(groups[1].type).toBeNull()
+    })
+
+    it('sorts groups alphabetically (case-insensitive)', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'snack', is_checked: false, sort_order: 0 },
+        { ...mockMeal, id: 'm2', meal_type: 'Breakfast', is_checked: false, sort_order: 1 },
+        { ...mockMeal, id: 'm3', meal_type: 'lunch', is_checked: false, sort_order: 2 },
+      ]
+      const labels = store.groupedMeals.map((g) => g.label)
+      expect(labels).toEqual(['Breakfast', 'lunch', 'snack'])
+    })
+
+    it('only includes groups that have meals', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'Breakfast', is_checked: false, sort_order: 0 },
+      ]
+      const groups = store.groupedMeals
+      expect(groups.length).toBe(1)
+      expect(groups[0].label).toBe('Breakfast')
+    })
+
+    it('puts unchecked meals before checked meals within each group', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'Lunch', is_checked: true, sort_order: 0 },
+        { ...mockMeal, id: 'm2', meal_type: 'Lunch', is_checked: false, sort_order: 1 },
+      ]
+      const group = store.groupedMeals[0]
+      expect(group.meals[0].id).toBe('m2')
+      expect(group.meals[1].id).toBe('m1')
+    })
+
+    it('groups meals case-insensitively, using first-seen casing as label', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'Breakfast', is_checked: false, sort_order: 0 },
+        { ...mockMeal, id: 'm2', meal_type: 'breakfast', is_checked: false, sort_order: 1 },
+      ]
+      const groups = store.groupedMeals
+      expect(groups.length).toBe(1)
+      expect(groups[0].label).toBe('Breakfast')
+      expect(groups[0].meals.length).toBe(2)
+    })
+
+    it('returns empty array when there are no meals', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = []
+      expect(store.groupedMeals).toEqual([])
+    })
+  })
+
+  describe('mealTypeOptions', () => {
+    it('returns sorted unique non-null meal_type values', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'Dinner' },
+        { ...mockMeal, id: 'm2', meal_type: 'Breakfast' },
+        { ...mockMeal, id: 'm3', meal_type: null },
+      ]
+      expect(store.mealTypeOptions).toEqual(['Breakfast', 'Dinner'])
+    })
+
+    it('deduplicates case-insensitively, keeping first-seen casing', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [
+        { ...mockMeal, id: 'm1', meal_type: 'Breakfast' },
+        { ...mockMeal, id: 'm2', meal_type: 'breakfast' },
+        { ...mockMeal, id: 'm3', meal_type: 'BREAKFAST' },
+      ]
+      expect(store.mealTypeOptions).toEqual(['Breakfast'])
+    })
+
+    it('returns empty array when all meal_types are null', async () => {
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+      store.meals = [{ ...mockMeal, meal_type: null }]
+      expect(store.mealTypeOptions).toEqual([])
+    })
+  })
+
+  describe('addMeal() with meal_type', () => {
+    it('passes meal_type through to the insert payload', async () => {
+      const serverMeal = { ...mockMeal, id: 'server-1', meal_type: 'Brunch' }
+      mockFrom.mockReturnValue(makeBuilder({ data: serverMeal, error: null }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+
+      await store.addMeal({ ...addPayload, meal_type: 'Brunch' })
+
+      expect(store.meals[0].meal_type).toBe('Brunch')
+    })
+
+    it('sets meal_type on the temp meal optimistically', async () => {
+      mockFrom.mockReturnValue(makeBuilder({ data: { ...mockMeal, id: 'server-1', meal_type: 'Snack' }, error: null }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+
+      const addPromise = store.addMeal({ ...addPayload, meal_type: 'Snack' })
+      expect(store.meals[0].meal_type).toBe('Snack')
+      await addPromise
+    })
+
+    it('defaults meal_type to null when omitted', async () => {
+      const serverMeal = { ...mockMeal, id: 'server-1', meal_type: null }
+      mockFrom.mockReturnValue(makeBuilder({ data: serverMeal, error: null }))
+
+      const { useMealsStore } = await import('@/stores/meals')
+      const store = useMealsStore()
+
+      const addPromise = store.addMeal(addPayload)
+      expect(store.meals[0].meal_type).toBeNull()
+      await addPromise
+    })
+  })
+
   describe('unsubscribeRealtime()', () => {
     it('removes the channel and sets it to null', async () => {
       const ch = makeChannelMock()

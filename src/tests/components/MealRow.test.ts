@@ -153,4 +153,21 @@ describe('MealRow', () => {
     const wrapper = await mountRow()
     expect(wrapper.find('[data-testid="linked-count-badge"]').exists()).toBe(false)
   })
+
+  it('renders meal type badge when meal_type is set', async () => {
+    const wrapper = await mountRow({ meal: { ...baseMeal, meal_type: 'Brunch' } })
+    const badge = wrapper.find('[data-testid="meal-type-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('Brunch')
+  })
+
+  it('does not render meal type badge when meal_type is null', async () => {
+    const wrapper = await mountRow({ meal: { ...baseMeal, meal_type: null } })
+    expect(wrapper.find('[data-testid="meal-type-badge"]').exists()).toBe(false)
+  })
+
+  it('shows the exact text from meal_type in the badge', async () => {
+    const wrapper = await mountRow({ meal: { ...baseMeal, meal_type: 'Late Night Snack' } })
+    expect(wrapper.find('[data-testid="meal-type-badge"]').text()).toBe('Late Night Snack')
+  })
 })

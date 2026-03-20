@@ -9,6 +9,18 @@
         placeholder="Add a meal..."
         class="input flex-1"
       />
+      <input
+        v-model="newMealType"
+        data-testid="add-meal-type-input"
+        type="text"
+        placeholder="Type (optional)"
+        class="input"
+        style="max-width: 140px"
+        list="meal-type-options-add"
+      />
+      <datalist id="meal-type-options-add">
+        <option v-for="opt in mealsStore.mealTypeOptions" :key="opt" :value="opt" />
+      </datalist>
       <button
         type="submit"
         data-testid="add-meal-btn"
@@ -36,6 +48,26 @@
       <p class="text-sm">Add a meal above to get started.</p>
     </div>
 
+    <!-- Grouped view -->
+    <template v-else-if="groupByType">
+      <div v-for="group in mealsStore.groupedMeals" :key="group.label">
+        <h3
+          data-testid="meal-group-header"
+          class="text-sm font-semibold mt-4 mb-1 px-2"
+          style="color: var(--color-text-secondary)"
+        >
+          {{ group.label }}
+        </h3>
+        <MealRow
+          v-for="meal in group.meals"
+          :key="meal.id"
+          :meal="meal"
+          :linked-grocery-count="groceryStore.mealGroceryCounts[meal.id] ?? 0"
+          :linked-item-ids="groceryStore.mealItemIds[meal.id] ?? []"
+        />
+      </div>
+    </template>
+
     <!-- Flat list: unchecked first, then checked -->
     <template v-else>
       <MealRow
@@ -50,6 +82,14 @@
     <!-- Bottom actions -->
     <div class="flex items-center gap-2 mt-4">
       <ClearCheckedButton @clear="mealsStore.clearChecked()" />
+      <button
+        type="button"
+        data-testid="group-by-type-toggle"
+        class="btn-ghost"
+        @click="groupByType = !groupByType"
+      >
+        {{ groupByType ? 'Flat list' : 'Group by type' }}
+      </button>
     </div>
   </div>
 </template>
@@ -69,7 +109,9 @@ const groceryStore = useGroceryStore()
 const householdStore = useHouseholdStore()
 
 const newTitle = ref('')
+const newMealType = ref('')
 const adding = ref(false)
+const groupByType = ref(false)
 
 const sortedMeals = computed(() => {
   const unchecked = mealsStore.meals.filter((m) => !m.is_checked).sort((a, b) => a.sort_order - b.sort_order)
@@ -88,8 +130,10 @@ async function handleAdd() {
       sort_order: mealsStore.meals.length > 0
         ? Math.max(...mealsStore.meals.map((m) => m.sort_order)) + 1
         : 0,
+      meal_type: newMealType.value.trim() || null,
     })
     newTitle.value = ''
+    newMealType.value = ''
   } finally {
     adding.value = false
   }
