@@ -40,6 +40,7 @@ export interface GroceryItem {
   section_id: string
   name: string
   quantity: string | null
+  store: string | null
   is_checked: boolean
   sort_order: number
   created_by: string

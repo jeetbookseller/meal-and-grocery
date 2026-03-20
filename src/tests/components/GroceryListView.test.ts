@@ -11,6 +11,7 @@ const { mockState } = vi.hoisted(() => {
       section_id: 'sec-1',
       name: 'Apples',
       quantity: '6',
+      store: null,
       is_checked: false,
       sort_order: 0,
       created_by: 'user-1',
@@ -22,6 +23,7 @@ const { mockState } = vi.hoisted(() => {
       section_id: 'sec-1',
       name: 'Milk',
       quantity: null,
+      store: null,
       is_checked: true,
       sort_order: 1,
       created_by: 'user-1',
@@ -43,6 +45,7 @@ const { mockState } = vi.hoisted(() => {
       fetchItemMealLinks: vi.fn().mockResolvedValue(undefined),
       itemMealLinks: {} as Record<string, Array<{ id: string; title: string }>>,
       mealGroceryCounts: {} as Record<string, number>,
+      storeNames: [] as string[],
     },
   }
 })
@@ -64,6 +67,7 @@ const defaultItems = [
     section_id: 'sec-1',
     name: 'Apples',
     quantity: '6',
+    store: null,
     is_checked: false,
     sort_order: 0,
     created_by: 'user-1',
@@ -75,6 +79,7 @@ const defaultItems = [
     section_id: 'sec-1',
     name: 'Milk',
     quantity: null,
+    store: null,
     is_checked: true,
     sort_order: 1,
     created_by: 'user-1',
@@ -195,5 +200,74 @@ describe('GroceryListView.vue', () => {
     await wrapper.find('form').trigger('submit')
     await wrapper.vm.$nextTick()
     expect((wrapper.find('[data-testid="global-add-input"]').element as HTMLInputElement).value).toBe('')
+  })
+
+  // ─── Grouping toggle ──────────────────────────────────────────────────────
+  it('renders a grouping toggle button', () => {
+    const wrapper = mount(GroceryListView)
+    expect(wrapper.find('[data-testid="group-toggle-btn"]').exists()).toBe(true)
+  })
+
+  it('toggle button shows "By Store" label initially (switching to that mode)', () => {
+    const wrapper = mount(GroceryListView)
+    expect(wrapper.find('[data-testid="group-toggle-btn"]').text()).toContain('By Store')
+  })
+
+  it('clicking toggle switches to By Store mode (button shows "Default")', async () => {
+    const wrapper = mount(GroceryListView)
+    await wrapper.find('[data-testid="group-toggle-btn"]').trigger('click')
+    expect(wrapper.find('[data-testid="group-toggle-btn"]').text()).toContain('Default')
+  })
+
+  // ─── By Store mode ────────────────────────────────────────────────────────
+  describe('By Store mode', () => {
+    const storeItems = [
+      { id: 'item-1', household_id: 'hh-1', section_id: 'sec-1', name: 'Apples', quantity: null, store: 'Whole Foods', is_checked: false, sort_order: 0, created_by: 'u1', created_at: '' },
+      { id: 'item-2', household_id: 'hh-1', section_id: 'sec-1', name: 'Bananas', quantity: null, store: "Trader Joe's", is_checked: false, sort_order: 1, created_by: 'u1', created_at: '' },
+      { id: 'item-3', household_id: 'hh-1', section_id: 'sec-1', name: 'Milk', quantity: null, store: null, is_checked: false, sort_order: 2, created_by: 'u1', created_at: '' },
+    ]
+
+    it('renders store group headers in By Store mode', async () => {
+      mockState.items = storeItems as any
+      const wrapper = mount(GroceryListView)
+      await wrapper.find('[data-testid="group-toggle-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      const headers = wrapper.findAll('[data-testid="store-group-header"]')
+      expect(headers.length).toBeGreaterThan(0)
+    })
+
+    it('groups are in alphabetical order by store name', async () => {
+      mockState.items = storeItems as any
+      const wrapper = mount(GroceryListView)
+      await wrapper.find('[data-testid="group-toggle-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      const headers = wrapper.findAll('[data-testid="store-group-header"]')
+      const texts = headers.map(h => h.text())
+      expect(texts[0]).toContain("Trader Joe's")
+      expect(texts[1]).toContain('Whole Foods')
+    })
+
+    it('"No store" group appears last', async () => {
+      mockState.items = storeItems as any
+      const wrapper = mount(GroceryListView)
+      await wrapper.find('[data-testid="group-toggle-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      const headers = wrapper.findAll('[data-testid="store-group-header"]')
+      expect(headers[headers.length - 1].text()).toContain('No store')
+    })
+
+    it('unchecked items render before checked items within each group', async () => {
+      const mixed = [
+        { id: 'i-a', household_id: 'hh-1', section_id: 'sec-1', name: 'Checked', quantity: null, store: 'Whole Foods', is_checked: true, sort_order: 0, created_by: 'u1', created_at: '' },
+        { id: 'i-b', household_id: 'hh-1', section_id: 'sec-1', name: 'Unchecked', quantity: null, store: 'Whole Foods', is_checked: false, sort_order: 1, created_by: 'u1', created_at: '' },
+      ]
+      mockState.items = mixed as any
+      const wrapper = mount(GroceryListView)
+      await wrapper.find('[data-testid="group-toggle-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      const items = wrapper.findAll('[data-testid="grocery-item"]')
+      expect(items[0].text()).toContain('Unchecked')
+      expect(items[1].text()).toContain('Checked')
+    })
   })
 })

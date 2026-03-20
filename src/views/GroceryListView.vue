@@ -1,6 +1,16 @@
 <template>
   <div class="p-4 max-w-3xl mx-auto">
-    <h2 class="text-xl font-semibold mb-4">Grocery List</h2>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold">Grocery List</h2>
+      <button
+        type="button"
+        data-testid="group-toggle-btn"
+        class="btn-ghost min-h-[44px]"
+        @click="groupingMode = groupingMode === 'default' ? 'by-store' : 'default'"
+      >
+        {{ groupingMode === 'default' ? 'By Store' : 'Default' }}
+      </button>
+    </div>
 
     <!-- Global Add to List -->
     <form class="flex gap-2 mb-4" @submit.prevent="handleAddItem">
@@ -40,16 +50,43 @@
       <p class="text-sm">Add an item above to get started.</p>
     </div>
 
-    <!-- Flat item list -->
+    <!-- Item list -->
     <template v-else>
-      <GroceryItem
-        v-for="item in sortedItems"
-        :key="item.id"
-        :item="item"
-        :linked-meals="groceryStore.itemMealLinks[item.id]"
-        @edit="editingItem = $event"
-        @delete="groceryStore.deleteItem($event.id)"
-      />
+      <!-- By Store mode -->
+      <template v-if="groupingMode === 'by-store'">
+        <div
+          v-for="group in groupedItems"
+          :key="group.store ?? '__no_store__'"
+        >
+          <div
+            data-testid="store-group-header"
+            class="text-lg font-semibold px-2 py-2 mt-3 border-b border-[var(--color-border)] sticky top-0 bg-[var(--color-background)]"
+            style="color: var(--color-text-primary)"
+          >
+            {{ group.store ?? 'No store' }}
+          </div>
+          <GroceryItem
+            v-for="item in group.items"
+            :key="item.id"
+            :item="item"
+            :linked-meals="groceryStore.itemMealLinks[item.id]"
+            :hide-store="true"
+            @edit="editingItem = $event"
+            @delete="groceryStore.deleteItem($event.id)"
+          />
+        </div>
+      </template>
+      <!-- Default mode -->
+      <template v-else>
+        <GroceryItem
+          v-for="item in sortedItems"
+          :key="item.id"
+          :item="item"
+          :linked-meals="groceryStore.itemMealLinks[item.id]"
+          @edit="editingItem = $event"
+          @delete="groceryStore.deleteItem($event.id)"
+        />
+      </template>
     </template>
 
     <!-- Bottom actions -->
@@ -84,6 +121,7 @@ const householdStore = useHouseholdStore()
 const newItemName = ref('')
 const addingItem = ref(false)
 const editingItem = ref<GroceryItemType | null>(null)
+const groupingMode = ref<'default' | 'by-store'>('default')
 
 const sortedItems = computed(() =>
   [...groceryStore.items].sort((a, b) => {
@@ -91,6 +129,26 @@ const sortedItems = computed(() =>
     return a.sort_order - b.sort_order
   })
 )
+
+const groupedItems = computed(() => {
+  const sorted = [...groceryStore.items].sort((a, b) => {
+    if (a.is_checked !== b.is_checked) return a.is_checked ? 1 : -1
+    return a.sort_order - b.sort_order
+  })
+  const groups = new Map<string | null, GroceryItemType[]>()
+  for (const item of sorted) {
+    const key = item.store || null
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(item)
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      if (a === null) return 1
+      if (b === null) return -1
+      return a.localeCompare(b)
+    })
+    .map(([store, items]) => ({ store, items }))
+})
 
 async function handleAddItem() {
   const name = newItemName.value.trim()

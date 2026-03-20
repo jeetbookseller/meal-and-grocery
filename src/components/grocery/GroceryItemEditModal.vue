@@ -34,6 +34,22 @@
           </div>
 
           <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-secondary)">Store</label>
+            <input
+              v-model="store"
+              data-testid="edit-store-input"
+              type="text"
+              list="store-names-list"
+              placeholder="e.g. Trader Joe's"
+              class="input"
+              :disabled="loading"
+            />
+            <datalist id="store-names-list">
+              <option v-for="name in groceryStore.storeNames" :key="name" :value="name" />
+            </datalist>
+          </div>
+
+          <div>
             <button
               type="button"
               data-testid="link-meals-btn"
@@ -109,6 +125,7 @@ const groceryStore = useGroceryStore()
 
 const name = ref(props.item.name)
 const quantity = ref(props.item.quantity ?? '')
+const store = ref(props.item.store ?? '')
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showMealPicker = ref(false)
@@ -122,6 +139,7 @@ async function handleSave() {
     await groceryStore.updateItem(props.item.id, {
       name: name.value.trim(),
       quantity: quantity.value || null,
+      store: store.value || null,
     })
     await groceryStore.linkItemToMeals(props.item.id, selectedMealIds.value)
     emit('close')
