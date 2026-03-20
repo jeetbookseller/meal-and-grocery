@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 max-w-2xl mx-auto">
+  <div class="p-4 max-w-3xl mx-auto">
     <h2 class="text-xl font-semibold mb-4">Grocery List</h2>
 
     <!-- Global Add to List -->

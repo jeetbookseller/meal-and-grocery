@@ -1,7 +1,7 @@
 <template>
   <div
     data-testid="grocery-item"
-    class="flex items-center gap-2 py-2 px-1 hover:bg-gray-50"
+    class="flex items-center gap-2 py-1.5 px-2 border-b border-[var(--color-border)] hover:bg-gray-50"
   >
     <label
       class="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer"
@@ -15,7 +15,7 @@
       />
     </label>
     <div class="flex-1 min-w-0">
-      <span :class="['text-sm', item.is_checked ? 'line-through text-gray-400' : 'text-gray-800']">
+      <span :class="['text-base', item.is_checked ? 'line-through text-gray-400' : 'text-gray-800']">
         {{ item.name }}
       </span>
       <span v-if="item.quantity !== null" data-testid="item-quantity" class="ml-1 text-xs text-gray-500">

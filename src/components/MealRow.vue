@@ -1,7 +1,7 @@
 <template>
   <div
     data-testid="meal-row"
-    class="flex items-center gap-2 py-2 px-1 rounded transition-colors duration-150"
+    class="flex items-center gap-2 py-1.5 px-2 border-b border-[var(--color-border)] rounded transition-colors duration-150"
     style="hover:background-color: var(--color-hover-bg)"
   >
     <!-- Checkbox -->
@@ -17,7 +17,7 @@
     <!-- Title -->
     <span
       data-testid="meal-title"
-      class="flex-1 text-sm"
+      class="flex-1 text-base"
       :class="meal.is_checked ? ['line-through', 'text-[var(--color-text-muted)]'] : ['text-[var(--color-text-primary)]']"
     >
       {{ meal.title }}
