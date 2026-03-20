@@ -12,6 +12,7 @@ vi.mock('@/stores/grocery', () => ({
     updateItem: mockUpdateItem,
     deleteItem: mockDeleteItem,
     linkItemToMeals: mockLinkItemToMeals,
+    storeNames: ["Trader Joe's", 'Whole Foods'],
   })),
 }))
 
@@ -31,6 +32,7 @@ const mockItem: GroceryItem = {
   section_id: 'sec-1',
   name: 'Apples',
   quantity: '6',
+  store: null,
   is_checked: false,
   sort_order: 0,
   created_by: 'user-1',
@@ -122,6 +124,54 @@ describe('GroceryItemEditModal.vue', () => {
   it('save button has btn-primary class', () => {
     const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
     expect(wrapper.find('[data-testid="save-item-btn"]').classes()).toContain('btn-primary')
+  })
+
+  // ─── Store input ───────────────────────────────────────────────────────────
+  it('renders store input field', () => {
+    const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
+    expect(wrapper.find('[data-testid="edit-store-input"]').exists()).toBe(true)
+  })
+
+  it('pre-fills store input with item store value', () => {
+    const item = { ...mockItem, store: "Trader Joe's" }
+    const wrapper = mount(GroceryItemEditModal, { props: { item } })
+    const input = wrapper.find('[data-testid="edit-store-input"]')
+    expect((input.element as HTMLInputElement).value).toBe("Trader Joe's")
+  })
+
+  it('includes store value in updateItem call on save', async () => {
+    mockUpdateItem.mockResolvedValue(undefined)
+    mockLinkItemToMeals.mockResolvedValue(undefined)
+    const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
+    await wrapper.find('[data-testid="edit-store-input"]').setValue('Costco')
+    await wrapper.find('form').trigger('submit')
+    expect(mockUpdateItem).toHaveBeenCalledWith(
+      'item-1',
+      expect.objectContaining({ store: 'Costco' })
+    )
+  })
+
+  it('passes null for store when input is empty', async () => {
+    mockUpdateItem.mockResolvedValue(undefined)
+    mockLinkItemToMeals.mockResolvedValue(undefined)
+    const item = { ...mockItem, store: 'Costco' }
+    const wrapper = mount(GroceryItemEditModal, { props: { item } })
+    await wrapper.find('[data-testid="edit-store-input"]').setValue('')
+    await wrapper.find('form').trigger('submit')
+    expect(mockUpdateItem).toHaveBeenCalledWith(
+      'item-1',
+      expect.objectContaining({ store: null })
+    )
+  })
+
+  it('renders datalist with existing store names', () => {
+    const wrapper = mount(GroceryItemEditModal, { props: { item: mockItem } })
+    const datalist = wrapper.find('datalist')
+    expect(datalist.exists()).toBe(true)
+    const options = wrapper.findAll('datalist option')
+    const values = options.map(o => (o.element as HTMLOptionElement).value)
+    expect(values).toContain("Trader Joe's")
+    expect(values).toContain('Whole Foods')
   })
 
   it('overlay has backdrop-blur-sm class', () => {

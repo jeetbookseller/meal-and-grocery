@@ -47,6 +47,7 @@ const mockItem = {
   section_id: 'sec-1',
   name: 'Apples',
   quantity: '6',
+  store: null,
   is_checked: false,
   sort_order: 0,
   created_by: 'user-1',
@@ -59,6 +60,7 @@ const mockItem2 = {
   section_id: 'sec-1',
   name: 'Bananas',
   quantity: null,
+  store: null,
   is_checked: true,
   sort_order: 1,
   created_by: 'user-1',
@@ -189,6 +191,82 @@ describe('useGroceryStore', () => {
       const store = useGroceryStore()
       await store.addItem({ name: 'Apples', household_id: 'hh-1' })
       expect(store.error).toBe('Insert failed')
+    })
+  })
+
+  // --- store field ---
+  describe('store field', () => {
+    it('addItem with a store value persists it in the insert payload', async () => {
+      mockQueryBuilder.order.mockResolvedValueOnce({ data: [mockUngroupedSection], error: null })
+      const newItem = { ...mockItem, id: 'item-new', store: "Trader Joe's" }
+      mockQueryBuilder.single.mockResolvedValueOnce({ data: newItem, error: null })
+
+      const store = useGroceryStore()
+      await store.addItem({ name: 'Oat Milk', household_id: 'hh-1', store: "Trader Joe's" })
+
+      expect(mockQueryBuilder.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ store: "Trader Joe's" })
+      )
+      expect(store.items[0].store).toBe("Trader Joe's")
+    })
+
+    it('addItem without store defaults to null', async () => {
+      mockQueryBuilder.order.mockResolvedValueOnce({ data: [mockUngroupedSection], error: null })
+      const newItem = { ...mockItem, id: 'item-new', store: null }
+      mockQueryBuilder.single.mockResolvedValueOnce({ data: newItem, error: null })
+
+      const store = useGroceryStore()
+      await store.addItem({ name: 'Apples', household_id: 'hh-1' })
+
+      expect(mockQueryBuilder.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ store: null })
+      )
+    })
+
+    it('updateItem can set the store field', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null })
+      const store = useGroceryStore()
+      store.items = [{ ...mockItem, store: null }] as any
+      await store.updateItem('item-1', { store: 'Whole Foods' })
+      expect(store.items[0].store).toBe('Whole Foods')
+    })
+
+    it('updateItem can clear the store field', async () => {
+      mockQueryBuilder.eq.mockResolvedValueOnce({ error: null })
+      const store = useGroceryStore()
+      store.items = [{ ...mockItem, store: 'Whole Foods' }] as any
+      await store.updateItem('item-1', { store: null })
+      expect(store.items[0].store).toBeNull()
+    })
+  })
+
+  // --- storeNames ---
+  describe('storeNames', () => {
+    it('returns sorted deduplicated list of non-null store names', () => {
+      const store = useGroceryStore()
+      store.items = [
+        { ...mockItem, id: 'i1', store: 'Whole Foods' },
+        { ...mockItem, id: 'i2', store: "Trader Joe's" },
+        { ...mockItem, id: 'i3', store: 'Whole Foods' },
+        { ...mockItem, id: 'i4', store: null },
+      ] as any
+      expect(store.storeNames).toEqual(["Trader Joe's", 'Whole Foods'])
+    })
+
+    it('excludes null and empty string values', () => {
+      const store = useGroceryStore()
+      store.items = [
+        { ...mockItem, id: 'i1', store: null },
+        { ...mockItem, id: 'i2', store: '' },
+        { ...mockItem, id: 'i3', store: 'Costco' },
+      ] as any
+      expect(store.storeNames).toEqual(['Costco'])
+    })
+
+    it('returns empty array when no items have a store', () => {
+      const store = useGroceryStore()
+      store.items = [{ ...mockItem, store: null }] as any
+      expect(store.storeNames).toEqual([])
     })
   })
 

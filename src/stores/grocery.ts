@@ -39,6 +39,14 @@ export const useGroceryStore = defineStore('grocery', () => {
     return map
   })
 
+  const storeNames = computed(() => {
+    const names = new Set<string>()
+    for (const item of items.value) {
+      if (item.store) names.add(item.store)
+    }
+    return [...names].sort()
+  })
+
   let itemsChannel: ReturnType<typeof supabase.channel> | null = null
   let linksChannel: ReturnType<typeof supabase.channel> | null = null
 
@@ -110,6 +118,7 @@ export const useGroceryStore = defineStore('grocery', () => {
   async function addItem(payload: {
     name: string
     quantity?: string | null
+    store?: string | null
     household_id: string
   }) {
     error.value = null
@@ -120,7 +129,7 @@ export const useGroceryStore = defineStore('grocery', () => {
     try {
       const { data, error: insertError } = await supabase
         .from('grocery_items')
-        .insert({ ...payload, section_id: section.id, is_checked: false, sort_order: nextOrder })
+        .insert({ ...payload, store: payload.store ?? null, section_id: section.id, is_checked: false, sort_order: nextOrder })
         .select()
         .single()
       if (insertError) throw insertError
@@ -132,7 +141,7 @@ export const useGroceryStore = defineStore('grocery', () => {
 
   async function updateItem(
     id: string,
-    payload: Partial<Pick<GroceryItem, 'name' | 'quantity' | 'section_id' | 'is_checked'>>
+    payload: Partial<Pick<GroceryItem, 'name' | 'quantity' | 'store' | 'section_id' | 'is_checked'>>
   ) {
     error.value = null
     const idx = items.value.findIndex(i => i.id === id)
@@ -279,6 +288,7 @@ export const useGroceryStore = defineStore('grocery', () => {
     itemMealLinks,
     mealGroceryCounts,
     mealItemIds,
+    storeNames,
     loading,
     error,
     fetchItems,

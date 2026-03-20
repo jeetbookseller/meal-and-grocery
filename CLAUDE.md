@@ -42,8 +42,8 @@ App.vue
         │   ├── MealEditModal.vue       (title + linked grocery picker)
         │   └── ClearCheckedButton.vue
         └── GroceryListView.vue         (Tab 2: /app/groceries)
-            ├── GroceryItem.vue         (checkbox + name + qty + edit/delete + meal badges)
-            ├── GroceryItemEditModal.vue (name, qty, linked meals)
+            ├── GroceryItem.vue         (checkbox + name + qty + store label + edit/delete + meal badges; hideStore prop)
+            ├── GroceryItemEditModal.vue (name, qty, store input w/ datalist autocomplete, linked meals)
             ├── MealLinkPicker.vue      (modal for linking meals)
             └── ClearCheckedButton.vue
 ```
@@ -57,7 +57,8 @@ src/stores/
 ├── meals.ts      — meals[], fetchMeals(), addMeal(), updateMeal(), deleteMeal(),
 │                   toggleChecked(), clearChecked(), Realtime
 └── grocery.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
-                    toggleChecked(), clearChecked(), linkItemToMeals(), Realtime
+                    toggleChecked(), clearChecked(), linkItemToMeals(), Realtime,
+                    storeNames (computed: sorted deduped list of store names in use)
 ```
 
 ### Key Behaviors
@@ -65,6 +66,7 @@ src/stores/
 - **Meals**: flat list, unchecked first then checked (dimmed). `clearChecked()` deletes checked meals from DB.
 - **Groceries**: flat list, same order pattern. `section_id` FK kept in DB but never exposed in UI — a single "Ungrouped" section is auto-created internally.
 - **Cross-linking**: grocery items can be linked to meals. Meal rows show linked item count badge; grocery items show linked meal badges.
+- **Store field**: grocery items have an optional free-text `store` field (e.g. "Trader Joe's"). In default mode the store name is shown as a muted label on the item row. A toggle button in the header switches between "Default" (flat) and "By Store" grouping — in By Store mode items are grouped under bold store headers (alphabetical, "No store" last), and the per-item store label is hidden (redundant with header). Store names autocomplete from previously-used values via an HTML `<datalist>`.
 - **Realtime**: both stores subscribe to Supabase Realtime channels on mount, handling INSERT/UPDATE/DELETE.
 
 ---
@@ -82,6 +84,8 @@ src/stores/
 5. **Single internal grocery section**: The DB requires `section_id` on grocery items. A single "Ungrouped" section is auto-created on init via `_ensureUngroupedSection()`, but the UI never exposes section management.
 
 6. **Meals `is_checked`**: Added via migration `002_meals_is_checked.sql`. Checked meals are deleted on "Clear checked" (same behavior as groceries).
+
+7. **Free-text store field + datalist autocomplete**: Grocery items have an optional `store text` column instead of a separate stores table. This keeps it simple — no CRUD UI for stores, no FK constraints, and unused store names naturally disappear when items are cleared. Autocomplete is provided via HTML `<datalist>` wired to the `storeNames` computed (sorted, deduplicated list of store names currently in use).
 
 ---
 
@@ -120,6 +124,7 @@ src/stores/
 |------|----------------|
 | `supabase/migrations/001_initial_schema.sql` | Original schema + RLS |
 | `supabase/migrations/002_meals_is_checked.sql` | Adds `is_checked` to meals |
+| `supabase/migrations/003_grocery_store_field.sql` | Adds nullable `store` text column to grocery_items |
 | `src/lib/supabase.ts` | Typed Supabase client, imported by every store |
 | `src/types/database.ts` | TypeScript interfaces for all DB tables |
 | `src/stores/auth.ts` | Gates the entire app |

@@ -21,6 +21,14 @@
       <span v-if="item.quantity !== null" data-testid="item-quantity" class="ml-1 text-xs text-gray-500">
         {{ item.quantity }}
       </span>
+      <span
+        v-if="item.store && !hideStore"
+        data-testid="item-store"
+        class="ml-1 text-xs"
+        style="color: var(--color-text-secondary)"
+      >
+        {{ item.store }}
+      </span>
       <div v-if="linkedMeals && linkedMeals.length > 0" class="flex flex-wrap gap-1 mt-1">
         <span
           v-for="meal in linkedMeals"
@@ -62,6 +70,7 @@ import type { GroceryItem } from '@/types/database'
 defineProps<{
   item: GroceryItem
   linkedMeals?: Array<{ id: string; title: string }>
+  hideStore?: boolean
 }>()
 
 defineEmits<{

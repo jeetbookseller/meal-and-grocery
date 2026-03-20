@@ -20,6 +20,7 @@ const baseItem: GroceryItemType = {
   section_id: 'sec-1',
   name: 'Apples',
   quantity: '6',
+  store: null,
   is_checked: false,
   sort_order: 0,
   created_by: 'user-1',
@@ -129,5 +130,24 @@ describe('GroceryItem.vue', () => {
     const wrapper = mount(GroceryItem, { props: { item: baseItem } })
     const label = wrapper.find('label')
     expect(label.find('input[type="checkbox"]').exists()).toBe(true)
+  })
+
+  // ─── Store label ─────────────────────────────────────────────────────────────
+  it('shows store name as muted label when item has a store and hideStore is false', () => {
+    const item = { ...baseItem, store: "Trader Joe's" }
+    const wrapper = mount(GroceryItem, { props: { item } })
+    expect(wrapper.find('[data-testid="item-store"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="item-store"]').text()).toContain("Trader Joe's")
+  })
+
+  it('does not show store label when item.store is null', () => {
+    const wrapper = mount(GroceryItem, { props: { item: { ...baseItem, store: null } } })
+    expect(wrapper.find('[data-testid="item-store"]').exists()).toBe(false)
+  })
+
+  it('hides store label when hideStore prop is true', () => {
+    const item = { ...baseItem, store: "Trader Joe's" }
+    const wrapper = mount(GroceryItem, { props: { item, hideStore: true } })
+    expect(wrapper.find('[data-testid="item-store"]').exists()).toBe(false)
   })
 })
