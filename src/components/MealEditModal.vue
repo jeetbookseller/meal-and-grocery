@@ -31,6 +31,21 @@
           </div>
 
           <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--color-text-primary)">Type</label>
+            <input
+              v-model="mealType"
+              type="text"
+              data-testid="meal-type-input"
+              placeholder="Type (optional)"
+              class="input"
+              list="meal-type-options-edit"
+            />
+            <datalist id="meal-type-options-edit">
+              <option v-for="opt in mealsStore.mealTypeOptions" :key="opt" :value="opt" />
+            </datalist>
+          </div>
+
+          <div>
             <button
               type="button"
               data-testid="link-groceries-btn"
@@ -88,6 +103,7 @@ const mealsStore = useMealsStore()
 const groceryStore = useGroceryStore()
 
 const title = ref(props.meal.title)
+const mealType = ref(props.meal.meal_type ?? '')
 const isLoading = ref(false)
 const showGroceryPicker = ref(false)
 const selectedItemIds = ref<string[]>(props.linkedItemIds ? [...props.linkedItemIds] : [])
@@ -95,7 +111,10 @@ const selectedItemIds = ref<string[]>(props.linkedItemIds ? [...props.linkedItem
 async function handleSubmit() {
   isLoading.value = true
   try {
-    await mealsStore.updateMeal(props.meal.id, { title: title.value })
+    await mealsStore.updateMeal(props.meal.id, {
+      title: title.value,
+      meal_type: mealType.value.trim() || null,
+    })
     if (!mealsStore.error) {
       await groceryStore.linkMealToItems(props.meal.id, selectedItemIds.value)
       emit('close')

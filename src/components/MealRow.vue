@@ -23,6 +23,16 @@
       {{ meal.title }}
     </span>
 
+    <!-- Meal type badge -->
+    <span
+      v-if="meal.meal_type"
+      data-testid="meal-type-badge"
+      class="text-xs font-medium px-2 py-0.5 rounded-full"
+      style="background-color: var(--color-hover-bg); color: var(--color-text-secondary)"
+    >
+      {{ meal.meal_type }}
+    </span>
+
     <!-- Linked grocery count badge -->
     <span
       v-if="linkedGroceryCount > 0"

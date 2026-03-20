@@ -26,7 +26,7 @@ For every task: **plan → tests → implement → document**
 
 ## Current Architecture
 
-**Design**: Anylist-style flat lists with Notion-style aesthetics. Both meals and groceries are simple, flat, checkable lists. No date grouping, no meal types, no grocery sections.
+**Design**: Anylist-style flat lists with Notion-style aesthetics. Both meals and groceries are simple, flat, checkable lists. No date grouping, no grocery sections. Meals support optional free-form type tags with a toggle to group by type.
 
 ### Component Tree
 
@@ -38,8 +38,8 @@ App.vue
     └── AppLayout.vue
         ├── TopNav.vue                  (tabs + user avatar + logout)
         ├── MealPlanView.vue            (Tab 1: /app/meals)
-        │   ├── MealRow.vue             (checkbox + title + linked count + edit/delete)
-        │   ├── MealEditModal.vue       (title + linked grocery picker)
+        │   ├── MealRow.vue             (checkbox + title + meal type badge + linked count + edit/delete)
+        │   ├── MealEditModal.vue       (title + meal type input + linked grocery picker)
         │   └── ClearCheckedButton.vue
         └── GroceryListView.vue         (Tab 2: /app/groceries)
             ├── GroceryItem.vue         (checkbox + name + qty + store label + edit/delete + meal badges; hideStore prop)
@@ -54,7 +54,8 @@ App.vue
 src/stores/
 ├── auth.ts       — session, user, login(), signup(), logout()
 ├── household.ts  — householdId, householdName, ready flag
-├── meals.ts      — meals[], fetchMeals(), addMeal(), updateMeal(), deleteMeal(),
+├── meals.ts      — meals[], groupedMeals (computed), mealTypeOptions (computed),
+│                   fetchMeals(), addMeal(), updateMeal(), deleteMeal(),
 │                   toggleChecked(), clearChecked(), Realtime
 └── grocery.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
                     toggleChecked(), clearChecked(), linkItemToMeals(), Realtime,
@@ -68,6 +69,7 @@ src/stores/
 - **Cross-linking**: grocery items can be linked to meals. Meal rows show linked item count badge; grocery items show linked meal badges.
 - **Store field**: grocery items have an optional free-text `store` field (e.g. "Trader Joe's"). In default mode the store name is shown as a muted label on the item row. A toggle button in the header switches between "Default" (flat) and "By Store" grouping — in By Store mode items are grouped under bold store headers (alphabetical, "No store" last), and the per-item store label is hidden (redundant with header). Store names autocomplete from previously-used values via an HTML `<datalist>`.
 - **Realtime**: both stores subscribe to Supabase Realtime channels on mount, handling INSERT/UPDATE/DELETE.
+- **Meal Types**: meals can optionally be tagged with a free-form type (e.g., Breakfast, Brunch, Snack, Dessert). Previously used types appear as autocomplete suggestions via datalist. The UI has a toggle to group meals by type — groups are sorted alphabetically with untyped meals in an "Other" group at the end.
 
 ---
 
@@ -86,6 +88,8 @@ src/stores/
 6. **Meals `is_checked`**: Added via migration `002_meals_is_checked.sql`. Checked meals are deleted on "Clear checked" (same behavior as groceries).
 
 7. **Free-text store field + datalist autocomplete**: Grocery items have an optional `store text` column instead of a separate stores table. This keeps it simple — no CRUD UI for stores, no FK constraints, and unused store names naturally disappear when items are cleared. Autocomplete is provided via HTML `<datalist>` wired to the `storeNames` computed (sorted, deduplicated list of store names currently in use).
+
+8. **Free-form meal types**: `meal_type` is an unconstrained text column (CHECK constraint dropped in migration `003_meals_free_form_meal_type.sql`). Grouping is a client-side computed (`groupedMeals`). Autocomplete suggestions come from `mealTypeOptions` computed (deduped case-insensitively, sorted, from current store data). No separate lookup table — keeps it simple.
 
 ---
 
@@ -125,6 +129,7 @@ src/stores/
 | `supabase/migrations/001_initial_schema.sql` | Original schema + RLS |
 | `supabase/migrations/002_meals_is_checked.sql` | Adds `is_checked` to meals |
 | `supabase/migrations/003_grocery_store_field.sql` | Adds nullable `store` text column to grocery_items |
+| `supabase/migrations/003_meals_free_form_meal_type.sql` | Drops CHECK constraint on `meal_type` to allow free-form values |
 | `src/lib/supabase.ts` | Typed Supabase client, imported by every store |
 | `src/types/database.ts` | TypeScript interfaces for all DB tables |
 | `src/stores/auth.ts` | Gates the entire app |
