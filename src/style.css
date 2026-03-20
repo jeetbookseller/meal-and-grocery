@@ -18,12 +18,18 @@
 
 /* ─── Base ───────────────────────────────────────────────────────────────────── */
 :root {
-  font-size: 14px;
+  font-size: 16px;
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-background);
   color: var(--color-text-primary);
+}
+
+@media (min-width: 640px) {
+  :root {
+    font-size: 14px;
+  }
 }
 
 /* ─── Reusable Component Classes ─────────────────────────────────────────────── */

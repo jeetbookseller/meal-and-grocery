@@ -14,7 +14,7 @@
         data-testid="add-meal-type-input"
         type="text"
         placeholder="Type (optional)"
-        class="input"
+        class="input hidden sm:block"
         style="max-width: 140px"
         list="meal-type-options-add"
       />
