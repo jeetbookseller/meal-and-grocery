@@ -140,6 +140,51 @@ src/stores/
 
 ---
 
+## Future Improvements
+
+### Social Login (Google, Apple, GitHub)
+
+Add OAuth sign-in buttons to the login page alongside email/password. Supabase has built-in OAuth provider support — no DB migrations needed. The existing household onboarding flow already handles new users from any auth method.
+
+#### Code Changes
+
+| File | Change |
+|------|--------|
+| `src/stores/auth.ts` | Add `loginWithProvider(provider: 'google' \| 'apple' \| 'github')` using `supabase.auth.signInWithOAuth()` with `redirectTo: window.location.origin + window.location.pathname`. Don't set `loading = false` on success since the page navigates away. Export in return statement. |
+| `src/components/AuthForm.vue` | Add Google (white bg, "G" logo), Apple (black bg, Apple logo), GitHub (dark gray `#24292e` bg, octocat logo) buttons above the existing form, separated by an "or" divider. All buttons: full width, `min-h-[44px]`, disabled when loading. |
+| `src/lib/supabase.ts` | Add `auth: { detectSessionInUrl: true, flowType: 'implicit' }` to `createClient` options for hash router OAuth compatibility. |
+| `src/tests/stores/auth.test.ts` | Add `mockSignInWithOAuth` to mocks. Test `loginWithProvider()` for each provider, error handling, and loading state. |
+
+#### Hash Router + OAuth Redirect
+
+OAuth redirect returns `#access_token=...` which could collide with the hash router's `#/path` format. The Supabase client intercepts tokens from the hash before Vue Router runs (since `authStore.init()` completes before `app.mount()` in `main.ts`). If this causes issues, switch to `flowType: 'pkce'` which uses query params (`?code=xxx`) instead of hash fragments.
+
+#### OAuth Provider Setup (manual — Supabase Dashboard)
+
+Social login requires OAuth credentials configured in external dashboards and Supabase. These cannot be automated via MCP or CLI.
+
+**Google:**
+1. Google Cloud Console > APIs & Services > Credentials > Create OAuth 2.0 Client ID (Web application)
+2. Add authorized redirect URI: `https://<supabase-project-ref>.supabase.co/auth/v1/callback`
+3. Supabase Dashboard > Authentication > Providers > Google > Enable, paste Client ID + Secret
+
+**Apple:**
+1. Apple Developer Portal > Certificates, Identifiers & Profiles > Register Services ID with "Sign in with Apple"
+2. Set return URL: `https://<supabase-project-ref>.supabase.co/auth/v1/callback`
+3. Create private key for Sign in with Apple
+4. Supabase Dashboard > Authentication > Providers > Apple > Enable, paste Service ID, Team ID, Key ID, private key
+
+**GitHub:**
+1. GitHub > Settings > Developer settings > OAuth Apps > New OAuth App
+2. Set Authorization callback URL: `https://<supabase-project-ref>.supabase.co/auth/v1/callback`
+3. Supabase Dashboard > Authentication > Providers > GitHub > Enable, paste Client ID + Client Secret
+
+**Supabase Auth Settings:**
+1. Authentication > URL Configuration > Add redirect URLs: `https://jeetbookseller.github.io/meal-and-grocery/` and `http://localhost:5173`
+2. Authentication > Settings > Enable "Automatically link accounts with the same email"
+
+---
+
 ## Deploy Steps
 
 1. Run pending Supabase migrations in the SQL editor (check `supabase/migrations/`)
