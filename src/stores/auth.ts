@@ -11,6 +11,8 @@ export const useAuthStore = defineStore('auth', () => {
   const signupPendingConfirmation = ref(false)
   const emailConfirmed = ref(false)
   const resetPasswordSent = ref(false)
+  const passwordRecovery = ref(false)
+  const passwordUpdated = ref(false)
 
   async function init() {
     // Capture hash before Supabase parses and cleans it
@@ -19,6 +21,11 @@ export const useAuthStore = defineStore('auth', () => {
     // Detect email confirmation redirect (Supabase appends type=signup to hash)
     if (initialHash.includes('type=signup') || initialHash.includes('type=email_change')) {
       emailConfirmed.value = true
+    }
+
+    // Detect password recovery redirect (Supabase appends type=recovery to hash)
+    if (initialHash.includes('type=recovery')) {
+      passwordRecovery.value = true
     }
 
     const { data } = await supabase.auth.getSession()
@@ -35,6 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     supabase.auth.onAuthStateChange((_event, newSession) => {
       if (emailConfirmed.value) return
+      if (passwordRecovery.value) return
       session.value = newSession
       user.value = newSession?.user ?? null
     })
@@ -85,11 +93,28 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
+  async function updatePassword(newPassword: string) {
+    loading.value = true
+    error.value = null
+    const { error: err } = await supabase.auth.updateUser({ password: newPassword })
+    if (err) {
+      error.value = err.message
+    } else {
+      passwordUpdated.value = true
+      passwordRecovery.value = false
+      // Sign out so user logs in with new password
+      await supabase.auth.signOut()
+      session.value = null
+      user.value = null
+    }
+    loading.value = false
+  }
+
   async function logout() {
     await supabase.auth.signOut()
     user.value = null
     session.value = null
   }
 
-  return { user, session, loading, error, signupPendingConfirmation, emailConfirmed, resetPasswordSent, init, login, signup, resetPassword, logout }
+  return { user, session, loading, error, signupPendingConfirmation, emailConfirmed, resetPasswordSent, passwordRecovery, passwordUpdated, init, login, signup, resetPassword, updatePassword, logout }
 })
