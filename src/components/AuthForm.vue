@@ -46,12 +46,20 @@
         class="input"
       />
       <!-- Password requirements indicator (signup only) -->
-      <div v-if="mode === 'signup'" class="mt-1.5 flex items-center gap-1.5 text-xs">
-        <svg v-if="passwordMeetsLength" class="h-3.5 w-3.5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-        </svg>
-        <span v-else class="h-3.5 w-3.5 flex items-center justify-center text-text-muted shrink-0">&#x2022;</span>
-        <span :class="passwordMeetsLength ? 'text-accent' : 'text-text-muted'">At least 6 characters</span>
+      <div v-if="mode === 'signup'" class="mt-1.5 space-y-0.5 text-xs">
+        <div v-for="req in [
+          { met: passwordMeetsLength, label: 'At least 15 characters' },
+          { met: passwordHasLowercase, label: 'A lowercase letter' },
+          { met: passwordHasUppercase, label: 'An uppercase letter' },
+          { met: passwordHasDigit, label: 'A digit' },
+          { met: passwordHasSymbol, label: 'A symbol' },
+        ]" :key="req.label" class="flex items-center gap-1.5">
+          <svg v-if="req.met" class="h-3.5 w-3.5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          <span v-else class="h-3.5 w-3.5 flex items-center justify-center text-text-muted shrink-0">&#x2022;</span>
+          <span :class="req.met ? 'text-accent' : 'text-text-muted'">{{ req.label }}</span>
+        </div>
       </div>
     </div>
 
@@ -108,7 +116,14 @@ const password = ref('')
 const confirmPassword = ref('')
 const mode = ref<'login' | 'signup'>('login')
 
-const passwordMeetsLength = computed(() => password.value.length >= 6)
+const passwordMeetsLength = computed(() => password.value.length >= 15)
+const passwordHasLowercase = computed(() => /[a-z]/.test(password.value))
+const passwordHasUppercase = computed(() => /[A-Z]/.test(password.value))
+const passwordHasDigit = computed(() => /\d/.test(password.value))
+const passwordHasSymbol = computed(() => /[^a-zA-Z0-9]/.test(password.value))
+const passwordMeetsAll = computed(
+  () => passwordMeetsLength.value && passwordHasLowercase.value && passwordHasUppercase.value && passwordHasDigit.value && passwordHasSymbol.value
+)
 const showMismatchError = computed(
   () => mode.value === 'signup' && confirmPassword.value.length > 0 && confirmPassword.value !== password.value
 )
@@ -134,8 +149,8 @@ async function handleSubmit() {
       router.push('/app/meals')
     }
   } else {
-    if (!passwordMeetsLength.value) {
-      authStore.error = 'Password must be at least 6 characters'
+    if (!passwordMeetsAll.value) {
+      authStore.error = 'Password must be at least 15 characters and include a lowercase letter, uppercase letter, digit, and symbol'
       return
     }
     if (confirmPassword.value !== password.value) {
