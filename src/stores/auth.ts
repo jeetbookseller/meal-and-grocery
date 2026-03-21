@@ -69,6 +69,9 @@ export const useAuthStore = defineStore('auth', () => {
     const { data, error: err } = await supabase.auth.signUp({ email, password })
     if (err) {
       error.value = err.message
+    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      // Supabase returns a fake success for existing emails (to prevent enumeration)
+      error.value = 'An account with this email already exists. Please sign in instead.'
     } else {
       user.value = data.user ?? null
       session.value = data.session ?? null

@@ -114,6 +114,19 @@ describe('useAuthStore', () => {
       expect(store.error).toBe('User already registered')
       expect(store.loading).toBe(false)
     })
+
+    it('detects duplicate email signup via empty identities array', async () => {
+      mockSignUp.mockResolvedValue({
+        data: { user: { id: 'fake-id', email: 'existing@example.com', identities: [] }, session: null },
+        error: null,
+      })
+      const store = useAuthStore()
+      await store.signup('existing@example.com', 'password123')
+      expect(store.error).toBe('An account with this email already exists. Please sign in instead.')
+      expect(store.signupPendingConfirmation).toBe(false)
+      expect(store.user).toBeNull()
+      expect(store.loading).toBe(false)
+    })
   })
 
   describe('login() resets signup state', () => {
