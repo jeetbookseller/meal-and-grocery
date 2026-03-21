@@ -71,7 +71,7 @@ src/stores/
 - **Store field**: grocery items have an optional free-text `store` field (e.g. "Trader Joe's"). In default mode the store name is shown as a muted label on the item row. A toggle button in the header switches between "Default" (flat) and "By Store" grouping — in By Store mode items are grouped under bold store headers (alphabetical, "No store" last), and the per-item store label is hidden (redundant with header). Store names autocomplete from previously-used values via an HTML `<datalist>`.
 - **Realtime**: both stores subscribe to Supabase Realtime channels on mount, handling INSERT/UPDATE/DELETE.
 - **Meal Types**: meals can optionally be tagged with a free-form type (e.g., Breakfast, Brunch, Snack, Dessert). Previously used types appear as autocomplete suggestions via datalist. The UI has a toggle to group meals by type — groups are sorted alphabetically with untyped meals in an "Other" group at the end.
-- **Signup flow**: AuthForm shows password requirements indicator (min 6 chars) and confirm password field during signup. Client-side validation blocks submit if password is too short or fields don't match. On successful signup (when email confirmation is required), the form is replaced with a "check your email" success message. When returning from an email confirmation link, a "Email confirmed, please sign in" banner appears above the login form.
+- **Signup flow**: AuthForm shows password requirements indicators (min 15 chars, lowercase, uppercase, digit, symbol) and confirm password field during signup. Client-side validation blocks submit if password doesn't meet all requirements or fields don't match. On successful signup (when email confirmation is required), the form is replaced with a "check your email" success message. When returning from an email confirmation link, a "Email confirmed, please sign in" banner appears above the login form.
 
 ---
 
@@ -95,7 +95,7 @@ src/stores/
 
 9. **Email confirmation detection with hash router**: After email confirmation, Supabase redirects with `#access_token=...&type=signup` in the URL hash. `authStore.init()` captures `window.location.hash` **before** Supabase's `getSession()` parses and cleans it, checks for `type=signup` or `type=email_change`, sets `emailConfirmed = true`, then signs the user out so they see the login form with the confirmation banner. The `onAuthStateChange` listener is guarded to skip updates while `emailConfirmed` is true (prevents the sign-out event from resetting state).
 
-10. **Client-side password validation**: Password requirements (min 6 chars) are enforced both client-side (AuthForm blocks submit) and server-side (Supabase rejects short passwords). The client-side check is a UX convenience — Supabase remains the source of truth. The minimum length is configurable in Supabase Dashboard > Authentication > Settings.
+10. **Client-side password validation**: Password requirements (min 15 chars, lowercase, uppercase, digit, symbol) are enforced both client-side (AuthForm blocks submit) and server-side (Supabase rejects weak passwords). The client-side check is a UX convenience — Supabase remains the source of truth. Requirements are configurable in Supabase Dashboard > Authentication > Settings.
 
 ---
 
@@ -217,7 +217,7 @@ After configuring the dashboard:
 - [ ] Receive confirmation email with a clickable link
 - [ ] Click the link — land on login page with "Email confirmed!" banner
 - [ ] Sign in with the confirmed email — redirect to `/app/meals`
-- [ ] Try signing up with a short password (< 6 chars) — see inline requirement indicator and submit blocked
+- [ ] Try signing up with a weak password (missing length/lowercase/uppercase/digit/symbol) — see inline requirement indicators and submit blocked
 - [ ] Try mismatched confirm password — see "Passwords do not match" error
 
 ---
