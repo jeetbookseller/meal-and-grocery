@@ -8,13 +8,32 @@ export const useAuthStore = defineStore('auth', () => {
   const session = ref<Session | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const signupPendingConfirmation = ref(false)
+  const emailConfirmed = ref(false)
 
   async function init() {
+    // Capture hash before Supabase parses and cleans it
+    const initialHash = window.location.hash
+
+    // Detect email confirmation redirect (Supabase appends type=signup to hash)
+    if (initialHash.includes('type=signup') || initialHash.includes('type=email_change')) {
+      emailConfirmed.value = true
+    }
+
     const { data } = await supabase.auth.getSession()
-    session.value = data.session
-    user.value = data.session?.user ?? null
+
+    if (emailConfirmed.value) {
+      // User just confirmed email — sign them out so they see login form with message
+      await supabase.auth.signOut()
+      session.value = null
+      user.value = null
+    } else {
+      session.value = data.session
+      user.value = data.session?.user ?? null
+    }
 
     supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (emailConfirmed.value) return
       session.value = newSession
       user.value = newSession?.user ?? null
     })
@@ -23,6 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(email: string, password: string) {
     loading.value = true
     error.value = null
+    signupPendingConfirmation.value = false
+    emailConfirmed.value = false
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
     if (err) {
       error.value = err.message
@@ -42,6 +63,9 @@ export const useAuthStore = defineStore('auth', () => {
     } else {
       user.value = data.user ?? null
       session.value = data.session ?? null
+      if (!data.session) {
+        signupPendingConfirmation.value = true
+      }
     }
     loading.value = false
   }
@@ -52,5 +76,5 @@ export const useAuthStore = defineStore('auth', () => {
     session.value = null
   }
 
-  return { user, session, loading, error, init, login, signup, logout }
+  return { user, session, loading, error, signupPendingConfirmation, emailConfirmed, init, login, signup, logout }
 })

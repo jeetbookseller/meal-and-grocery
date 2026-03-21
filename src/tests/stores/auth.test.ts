@@ -95,6 +95,16 @@ describe('useAuthStore', () => {
       expect(store.session).toEqual(mockSession)
       expect(store.error).toBeNull()
       expect(store.loading).toBe(false)
+      expect(store.signupPendingConfirmation).toBe(false)
+    })
+
+    it('sets signupPendingConfirmation when no session returned (email confirmation required)', async () => {
+      mockSignUp.mockResolvedValue({ data: { user: mockUser, session: null }, error: null })
+      const store = useAuthStore()
+      await store.signup('new@example.com', 'password123')
+      expect(store.signupPendingConfirmation).toBe(true)
+      expect(store.session).toBeNull()
+      expect(store.user).toEqual(mockUser)
     })
 
     it('sets error string on failure', async () => {
@@ -103,6 +113,41 @@ describe('useAuthStore', () => {
       await store.signup('existing@example.com', 'password123')
       expect(store.error).toBe('User already registered')
       expect(store.loading).toBe(false)
+    })
+  })
+
+  describe('login() resets signup state', () => {
+    it('resets signupPendingConfirmation and emailConfirmed on login', async () => {
+      mockSignInWithPassword.mockResolvedValue({ data: { user: mockUser, session: mockSession }, error: null })
+      const store = useAuthStore()
+      store.signupPendingConfirmation = true
+      store.emailConfirmed = true
+      await store.login('test@example.com', 'password123')
+      expect(store.signupPendingConfirmation).toBe(false)
+      expect(store.emailConfirmed).toBe(false)
+    })
+  })
+
+  describe('init() email confirmation detection', () => {
+    it('detects email confirmation from URL hash with type=signup', async () => {
+      const originalHash = window.location.hash
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { ...window.location, hash: '#access_token=xxx&type=signup' },
+      })
+      mockGetSession.mockResolvedValue({ data: { session: mockSession } })
+      mockSignOut.mockResolvedValue({ error: null })
+      const store = useAuthStore()
+      await store.init()
+      expect(store.emailConfirmed).toBe(true)
+      expect(mockSignOut).toHaveBeenCalled()
+      expect(store.session).toBeNull()
+      expect(store.user).toBeNull()
+      // Restore
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { ...window.location, hash: originalHash },
+      })
     })
   })
 
