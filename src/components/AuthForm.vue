@@ -20,6 +20,89 @@
     </p>
   </div>
 
+  <!-- Password recovery: set new password -->
+  <form v-else-if="authStore.passwordRecovery" @submit.prevent="handleSetNewPassword" class="space-y-4">
+    <div class="p-3 rounded-md bg-accent/10 border border-accent/30 text-accent text-sm">
+      Set a new password for your account.
+    </div>
+
+    <div v-if="authStore.error" class="p-3 rounded-md bg-red-50 border border-danger/30 text-danger text-sm">
+      {{ authStore.error }}
+    </div>
+
+    <div>
+      <label for="new-password" class="block text-sm font-medium text-text-primary mb-1">New password</label>
+      <input
+        id="new-password"
+        v-model="password"
+        type="password"
+        required
+        autocomplete="new-password"
+        placeholder="••••••••"
+        class="input"
+      />
+      <div class="mt-1.5 space-y-0.5 text-xs">
+        <div v-for="req in [
+          { met: passwordMeetsLength, label: 'At least 15 characters' },
+          { met: passwordHasLowercase, label: 'A lowercase letter' },
+          { met: passwordHasUppercase, label: 'An uppercase letter' },
+          { met: passwordHasDigit, label: 'A digit' },
+          { met: passwordHasSymbol, label: 'A symbol' },
+        ]" :key="req.label" class="flex items-center gap-1.5">
+          <svg v-if="req.met" class="h-3.5 w-3.5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          <span v-else class="h-3.5 w-3.5 flex items-center justify-center text-text-muted shrink-0">&#x2022;</span>
+          <span :class="req.met ? 'text-accent' : 'text-text-muted'">{{ req.label }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label for="confirm-new-password" class="block text-sm font-medium text-text-primary mb-1">Confirm new password</label>
+      <input
+        id="confirm-new-password"
+        v-model="confirmPassword"
+        type="password"
+        required
+        autocomplete="new-password"
+        placeholder="••••••••"
+        class="input"
+      />
+      <div v-if="confirmPassword.length > 0" class="mt-1.5 flex items-center gap-1.5 text-xs">
+        <svg v-if="confirmPassword === password" class="h-3.5 w-3.5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+        <span v-else class="h-3.5 w-3.5 flex items-center justify-center text-danger shrink-0">&#x2022;</span>
+        <span :class="confirmPassword === password ? 'text-accent' : 'text-danger'">
+          {{ confirmPassword === password ? 'Passwords match' : 'Passwords do not match' }}
+        </span>
+      </div>
+    </div>
+
+    <button
+      type="submit"
+      :disabled="authStore.loading"
+      class="btn-primary w-full gap-2"
+    >
+      <svg v-if="authStore.loading" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+      Update password
+    </button>
+  </form>
+
+  <!-- Password updated success -->
+  <div v-else-if="authStore.passwordUpdated" class="space-y-4 text-center">
+    <div class="p-3 rounded-md bg-accent/10 border border-accent/30 text-accent text-sm">
+      Password updated successfully!
+    </div>
+    <p class="text-sm text-text-secondary">
+      <button type="button" @click="backToLogin" class="text-accent hover:underline font-medium">Sign in</button> with your new password.
+    </p>
+  </div>
+
   <!-- Main form -->
   <form v-else @submit.prevent="handleSubmit" class="space-y-4">
     <!-- Email confirmed banner -->
@@ -171,10 +254,25 @@ function enterForgotMode() {
 
 function backToLogin() {
   mode.value = 'login'
+  password.value = ''
   confirmPassword.value = ''
   authStore.signupPendingConfirmation = false
   authStore.resetPasswordSent = false
+  authStore.passwordRecovery = false
+  authStore.passwordUpdated = false
   authStore.error = null
+}
+
+async function handleSetNewPassword() {
+  if (!passwordMeetsAll.value) {
+    authStore.error = 'Password must be at least 15 characters and include a lowercase letter, uppercase letter, digit, and symbol'
+    return
+  }
+  if (confirmPassword.value !== password.value) {
+    authStore.error = 'Passwords do not match'
+    return
+  }
+  await authStore.updatePassword(password.value)
 }
 
 async function handleSubmit() {
