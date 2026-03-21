@@ -75,7 +75,15 @@
         placeholder="••••••••"
         class="input"
       />
-      <p v-if="showMismatchError" class="mt-1 text-xs text-danger">Passwords do not match</p>
+      <div v-if="confirmPassword.length > 0" class="mt-1.5 flex items-center gap-1.5 text-xs">
+        <svg v-if="confirmPassword === password" class="h-3.5 w-3.5 text-accent shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+        <span v-else class="h-3.5 w-3.5 flex items-center justify-center text-danger shrink-0">&#x2022;</span>
+        <span :class="confirmPassword === password ? 'text-accent' : 'text-danger'">
+          {{ confirmPassword === password ? 'Passwords match' : 'Passwords do not match' }}
+        </span>
+      </div>
     </div>
 
     <button
