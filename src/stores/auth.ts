@@ -10,6 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null)
   const signupPendingConfirmation = ref(false)
   const emailConfirmed = ref(false)
+  const resetPasswordSent = ref(false)
 
   async function init() {
     // Capture hash before Supabase parses and cleans it
@@ -70,11 +71,25 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = false
   }
 
+  async function resetPassword(email: string) {
+    loading.value = true
+    error.value = null
+    resetPasswordSent.value = false
+    const redirectTo = window.location.origin + window.location.pathname
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    if (err) {
+      error.value = err.message
+    } else {
+      resetPasswordSent.value = true
+    }
+    loading.value = false
+  }
+
   async function logout() {
     await supabase.auth.signOut()
     user.value = null
     session.value = null
   }
 
-  return { user, session, loading, error, signupPendingConfirmation, emailConfirmed, init, login, signup, logout }
+  return { user, session, loading, error, signupPendingConfirmation, emailConfirmed, resetPasswordSent, init, login, signup, resetPassword, logout }
 })
