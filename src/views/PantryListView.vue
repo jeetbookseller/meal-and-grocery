@@ -73,6 +73,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePantryStore } from '@/stores/pantry'
 import { useHouseholdStore } from '@/stores/household'
+import { useMealsStore } from '@/stores/meals'
 import type { PantryItem as PantryItemType } from '@/types/database'
 import PantryItem from '@/components/PantryItem.vue'
 import ClearCheckedButton from '@/components/ClearCheckedButton.vue'
@@ -82,6 +83,7 @@ import PantryItemEditModal from '@/components/pantry/PantryItemEditModal.vue'
 
 const pantryStore = usePantryStore()
 const householdStore = useHouseholdStore()
+const mealsStore = useMealsStore()
 
 const newItemName = ref('')
 const addingItem = ref(false)
@@ -113,6 +115,7 @@ onMounted(async () => {
   await pantryStore.fetchItems()
   pantryStore.fetchItemMealLinks()
   pantryStore.subscribeRealtime()
+  mealsStore.fetchMeals()
 })
 
 onUnmounted(() => {
