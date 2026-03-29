@@ -146,7 +146,186 @@ src/stores/
 
 ---
 
+## Pantry Tab — Implementation Plan (MVP)
+
+Track what food is already at home. Third tab alongside Meals and Groceries. Simpler than Groceries — no store field, no sections, no grouping. Just a flat checkable list with meal linking.
+
+### Step 1: Database Migration — `supabase/migrations/005_pantry.sql`
+
+**`pantry_items` table** (modeled after `grocery_items`, no `section_id` or `store`):
+- `id` uuid PK default `gen_random_uuid()`
+- `household_id` uuid NOT NULL FK → `households(id) ON DELETE CASCADE`
+- `name` text NOT NULL
+- `quantity` text (nullable)
+- `is_checked` bool NOT NULL DEFAULT false
+- `sort_order` int NOT NULL DEFAULT 0
+- `created_by` uuid FK → `auth.users(id)`
+- `created_at` timestamptz NOT NULL DEFAULT `now()`
+- Index on `household_id`
+
+**`pantry_item_meals` junction table** (modeled after `grocery_item_meals`):
+- `pantry_item_id` uuid FK → `pantry_items(id) ON DELETE CASCADE`
+- `meal_id` uuid FK → `meals(id) ON DELETE CASCADE`
+- Composite PK `(pantry_item_id, meal_id)`
+
+**RLS**: Same policy patterns as `grocery_items` and `grocery_item_meals` in `001_initial_schema.sql` (lines 214–281). 4 policies on `pantry_items` checking `household_members`, 3 policies on `pantry_item_meals` joining through `pantry_items`.
+
+**Realtime**: `ALTER PUBLICATION supabase_realtime ADD TABLE pantry_items;`
+
+### Step 2: TypeScript Types — `src/types/database.ts`
+
+Add after `GroceryItemMeal`:
+```typescript
+export interface PantryItem {
+  id: string
+  household_id: string
+  name: string
+  quantity: string | null
+  is_checked: boolean
+  sort_order: number
+  created_by: string
+  created_at: string
+}
+
+export interface PantryItemMeal {
+  pantry_item_id: string
+  meal_id: string
+}
+```
+Add `pantry_items` and `pantry_item_meals` entries to `Database['Tables']`.
+
+### Step 3: Pinia Store — `src/stores/pantry.ts` (NEW)
+
+Simplified copy of `src/stores/grocery.ts`. Strip out: sections, `store` field, `storeNames` computed, `_ensureUngroupedSection`.
+
+- **State**: `items` (PantryItem[]), `itemLinks`, `loading`, `error`
+- **Computed**: `itemMealLinks`, `mealPantryCounts`, `mealItemIds` — same logic as grocery store equivalents
+- **Methods**: `fetchItems()`, `fetchItemMealLinks()`, `addItem()`, `updateItem()`, `deleteItem()`, `toggleChecked()`, `clearChecked()`, `linkItemToMeals()`, `linkMealToItems()`, `subscribeRealtime()`, `unsubscribeRealtime()`
+- Realtime channels: `pantry-items-changes`, `pantry-item-meals-changes`
+
+### Step 4: Components
+
+#### 4a. `src/components/PantryItem.vue` (NEW)
+Simplified copy of `src/components/GroceryItem.vue`. No store badge, no `hideStore` prop. Uses `usePantryStore`.
+
+#### 4b. `src/components/pantry/PantryItemEditModal.vue` (NEW)
+Simplified copy of `src/components/grocery/GroceryItemEditModal.vue`. Only Name + Quantity fields (no Store). Reuses `MealLinkPicker.vue` as-is for meal linking.
+
+#### 4c. `src/components/pantry/PantryLinkPicker.vue` (NEW)
+Copy of `src/components/grocery/GroceryLinkPicker.vue` adapted for pantry items. Title: "Link to Pantry Items". Used by MealEditModal.
+
+### Step 5: View — `src/views/PantryListView.vue` (NEW)
+
+Simplified copy of `src/views/GroceryListView.vue`. No grouping toggle, no store-based grouping. Quick-add form (name only), flat sorted list, ClearCheckedButton at bottom. Empty state: "Your pantry is empty."
+
+### Step 6: Router — `src/router/index.ts`
+
+Add child route under `/app`:
+```typescript
+{ path: 'pantry', name: 'pantry', component: () => import('@/views/PantryListView.vue') }
+```
+
+### Step 7: TopNav — `src/components/TopNav.vue`
+
+Add third `RouterLink` to `/app/pantry` with text "Pantry", same styling as existing tabs.
+
+### Step 8: Meal Integration
+
+#### `src/components/MealRow.vue`
+- Add props: `linkedPantryCount?: number`, `linkedPantryItemIds?: string[]`
+- Add a second badge (green/teal tone) showing pantry count when > 0
+
+#### `src/components/MealEditModal.vue`
+- Add prop `linkedPantryItemIds?: string[]`
+- Add second link picker button → `PantryLinkPicker`
+- In `handleSubmit`, also call `pantryStore.linkMealToItems()`
+
+#### `src/views/MealPlanView.vue`
+- Import `usePantryStore`, fetch pantry items + links in `onMounted`
+- Pass `linkedPantryCount` and `linkedPantryItemIds` to every `MealRow`
+
+### Step 9: Tests
+
+- `src/tests/stores/pantry.test.ts` — mirror grocery store tests
+- `src/tests/components/PantryItem.test.ts`
+- `src/tests/components/PantryListView.test.ts`
+
+### Step 10: Update CLAUDE.md
+
+After implementation, update these sections:
+
+**Component Tree** — add under AppLayout:
+```
+├── PantryListView.vue          (Tab 3: /app/pantry)
+│   ├── PantryItem.vue          (checkbox + name + qty + meal badges + edit/delete)
+│   ├── PantryItemEditModal.vue (name, qty, linked meals)
+│   └── ClearCheckedButton.vue
+```
+
+**Store Structure** — add:
+```
+├── pantry.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
+                   toggleChecked(), clearChecked(), linkItemToMeals(), Realtime
+```
+
+**Key Behaviors** — add: Pantry is a flat list of items at home. Same check/clear pattern as groceries. Items link to meals via `pantry_item_meals` junction table. No store field, no grouping.
+
+**Design Decisions** — add: Pantry tab is intentionally simpler than Groceries — no store field, no sections, no grouping. Just a flat checkable list with meal linking.
+
+**Critical Files** — add: `supabase/migrations/005_pantry.sql` and `src/stores/pantry.ts`.
+
+### Key Files to Reference (Templates)
+
+| New file | Copy/simplify from |
+|----------|-------------------|
+| `src/stores/pantry.ts` | `src/stores/grocery.ts` |
+| `src/components/PantryItem.vue` | `src/components/GroceryItem.vue` |
+| `src/components/pantry/PantryItemEditModal.vue` | `src/components/grocery/GroceryItemEditModal.vue` |
+| `src/components/pantry/PantryLinkPicker.vue` | `src/components/grocery/GroceryLinkPicker.vue` |
+| `src/views/PantryListView.vue` | `src/views/GroceryListView.vue` |
+
+### Verification
+
+1. Run `npm run test` — all existing + new tests pass
+2. Run `npm run dev` — verify 3 tabs render correctly
+3. Add pantry items, check/uncheck, clear checked
+4. Link pantry items to meals from both directions (PantryItemEditModal and MealEditModal)
+5. Verify MealRow shows both grocery and pantry count badges
+6. Open two tabs — verify Realtime sync for pantry items
+7. Run the migration SQL in Supabase dashboard before deploying
+
+---
+
 ## Future Improvements
+
+### Grocery ↔ Pantry Transfer Flow
+
+Seamless movement of items between Grocery and Pantry tabs, keeping meal links intact.
+
+#### Behaviors
+
+1. **Grocery → Pantry** (item bought): When a grocery item is checked off, prompt "Add to Pantry?" If yes, create a pantry item with the same name/quantity, copy all meal links from `grocery_item_meals` to `pantry_item_meals`, then proceed with normal check behavior.
+
+2. **Pantry → Grocery** (item used up): When a pantry item is checked off, prompt "Add to Grocery list?" If yes, create a grocery item with the same name/quantity, copy all meal links from `pantry_item_meals` to `grocery_item_meals`, then proceed with normal check behavior.
+
+3. **Meal link transfer**: When transferring between tabs, all entries in the source junction table for that item are replicated to the destination junction table. The source item's links remain until it is cleared.
+
+4. **Meal view enhancement**: Under each linked meal, show item availability status:
+   - Items linked via `pantry_item_meals` show as "available" (green indicator)
+   - Items linked via `grocery_item_meals` show as "to buy" (blue/orange indicator)
+   - This appears in MealRow's expanded detail or in MealEditModal
+
+#### Code Changes
+
+| File | Change |
+|------|--------|
+| `src/stores/grocery.ts` | Add `transferToPantry(itemId)` — creates pantry item, copies meal links |
+| `src/stores/pantry.ts` | Add `transferToGrocery(itemId)` — creates grocery item, copies meal links |
+| `src/components/GroceryItem.vue` | After `toggleChecked`, show confirmation dialog for pantry transfer |
+| `src/components/PantryItem.vue` | After `toggleChecked`, show confirmation dialog for grocery transfer |
+| `src/components/TransferConfirmDialog.vue` | New reusable "Add to [Tab]?" dialog component |
+| `src/components/MealRow.vue` | Show "available" vs "to buy" indicators for linked items |
+| `src/components/MealEditModal.vue` | Display availability status next to linked items |
 
 ### Social Login (Google, Apple, GitHub)
 
