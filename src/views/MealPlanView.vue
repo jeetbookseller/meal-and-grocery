@@ -64,6 +64,8 @@
           :meal="meal"
           :linked-grocery-count="groceryStore.mealGroceryCounts[meal.id] ?? 0"
           :linked-item-ids="groceryStore.mealItemIds[meal.id] ?? []"
+          :linked-pantry-count="pantryStore.mealPantryCounts[meal.id] ?? 0"
+          :linked-pantry-item-ids="pantryStore.mealItemIds[meal.id] ?? []"
         />
       </div>
     </template>
@@ -76,6 +78,8 @@
         :meal="meal"
         :linked-grocery-count="groceryStore.mealGroceryCounts[meal.id] ?? 0"
         :linked-item-ids="groceryStore.mealItemIds[meal.id] ?? []"
+        :linked-pantry-count="pantryStore.mealPantryCounts[meal.id] ?? 0"
+        :linked-pantry-item-ids="pantryStore.mealItemIds[meal.id] ?? []"
       />
     </template>
 
@@ -98,6 +102,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMealsStore } from '@/stores/meals'
 import { useGroceryStore } from '@/stores/grocery'
+import { usePantryStore } from '@/stores/pantry'
 import { useHouseholdStore } from '@/stores/household'
 import MealRow from '@/components/MealRow.vue'
 import ClearCheckedButton from '@/components/ClearCheckedButton.vue'
@@ -106,6 +111,7 @@ import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
 
 const mealsStore = useMealsStore()
 const groceryStore = useGroceryStore()
+const pantryStore = usePantryStore()
 const householdStore = useHouseholdStore()
 
 const newTitle = ref('')
@@ -144,6 +150,8 @@ onMounted(async () => {
   mealsStore.subscribeRealtime()
   await groceryStore.fetchItems()
   groceryStore.fetchItemMealLinks()
+  await pantryStore.fetchItems()
+  pantryStore.fetchItemMealLinks()
 })
 
 onUnmounted(() => {

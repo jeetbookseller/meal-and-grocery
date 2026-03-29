@@ -17,6 +17,13 @@
         >
           Groceries
         </RouterLink>
+        <RouterLink
+          to="/app/pantry"
+          class="px-3 min-h-[44px] flex items-center rounded-md text-sm font-medium text-text-secondary hover:text-accent hover:bg-hover-bg transition-colors duration-150 whitespace-nowrap"
+          active-class="nav-tab-active"
+        >
+          Pantry
+        </RouterLink>
       </div>
       <div class="flex items-center gap-1 shrink-0">
         <span

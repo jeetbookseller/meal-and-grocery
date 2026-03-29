@@ -4,11 +4,13 @@ import { setActivePinia, createPinia } from 'pinia'
 import type { Meal } from '@/types/database'
 
 // ─── Hoisted mocks ────────────────────────────────────────────────────────────
-const { mockUpdateMeal, mockMealsStore, mockLinkMealToItems, mockGroceryStore } = vi.hoisted(() => ({
+const { mockUpdateMeal, mockMealsStore, mockLinkMealToItems, mockGroceryStore, mockPantryLinkMealToItems, mockPantryStore } = vi.hoisted(() => ({
   mockUpdateMeal: vi.fn(),
   mockMealsStore: vi.fn(),
   mockLinkMealToItems: vi.fn(),
   mockGroceryStore: vi.fn(),
+  mockPantryLinkMealToItems: vi.fn(),
+  mockPantryStore: vi.fn(),
 }))
 
 vi.mock('@/stores/meals', () => ({
@@ -19,8 +21,16 @@ vi.mock('@/stores/grocery', () => ({
   useGroceryStore: mockGroceryStore,
 }))
 
+vi.mock('@/stores/pantry', () => ({
+  usePantryStore: mockPantryStore,
+}))
+
 vi.mock('@/components/grocery/GroceryLinkPicker.vue', () => ({
   default: { template: '<div class="grocery-link-picker-stub" />', props: ['modelValue'] },
+}))
+
+vi.mock('@/components/pantry/PantryLinkPicker.vue', () => ({
+  default: { template: '<div class="pantry-link-picker-stub" />', props: ['modelValue'] },
 }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -53,6 +63,12 @@ beforeEach(() => {
   mockLinkMealToItems.mockResolvedValue(undefined)
   mockGroceryStore.mockReturnValue({
     linkMealToItems: mockLinkMealToItems,
+    items: [],
+  })
+
+  mockPantryLinkMealToItems.mockResolvedValue(undefined)
+  mockPantryStore.mockReturnValue({
+    linkMealToItems: mockPantryLinkMealToItems,
     items: [],
   })
 })

@@ -52,6 +52,22 @@ export interface GroceryItemMeal {
   meal_id: string
 }
 
+export interface PantryItem {
+  id: string
+  household_id: string
+  name: string
+  quantity: string | null
+  is_checked: boolean
+  sort_order: number
+  created_by: string
+  created_at: string
+}
+
+export interface PantryItemMeal {
+  pantry_item_id: string
+  meal_id: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -84,6 +100,16 @@ export interface Database {
         Row: GroceryItemMeal
         Insert: GroceryItemMeal
         Update: Partial<GroceryItemMeal>
+      }
+      pantry_items: {
+        Row: PantryItem
+        Insert: Omit<PantryItem, 'id' | 'created_at'>
+        Update: Partial<Omit<PantryItem, 'id' | 'created_at'>>
+      }
+      pantry_item_meals: {
+        Row: PantryItemMeal
+        Insert: PantryItemMeal
+        Update: Partial<PantryItemMeal>
       }
     }
     Functions: {
