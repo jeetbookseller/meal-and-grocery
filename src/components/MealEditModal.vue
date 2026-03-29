@@ -57,6 +57,18 @@
             </button>
           </div>
 
+          <div>
+            <button
+              type="button"
+              data-testid="link-pantry-btn"
+              class="btn-ghost w-full text-left min-h-[44px]"
+              :disabled="isLoading"
+              @click="showPantryPicker = true"
+            >
+              {{ selectedPantryItemIds.length > 0 ? `Linked to ${selectedPantryItemIds.length} pantry item(s)` : 'Link to pantry...' }}
+            </button>
+          </div>
+
           <div class="flex justify-end gap-2">
             <button
               type="button"
@@ -84,6 +96,13 @@
     v-model="selectedItemIds"
     @close="showGroceryPicker = false"
   />
+
+  <!-- Pantry link picker -->
+  <PantryLinkPicker
+    v-if="showPantryPicker"
+    v-model="selectedPantryItemIds"
+    @close="showPantryPicker = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -91,22 +110,28 @@ import { ref } from 'vue'
 import type { Meal } from '@/types/database'
 import { useMealsStore } from '@/stores/meals'
 import { useGroceryStore } from '@/stores/grocery'
+import { usePantryStore } from '@/stores/pantry'
 import GroceryLinkPicker from '@/components/grocery/GroceryLinkPicker.vue'
+import PantryLinkPicker from '@/components/pantry/PantryLinkPicker.vue'
 
 const props = defineProps<{
   meal: Meal
   linkedItemIds?: string[]
+  linkedPantryItemIds?: string[]
 }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const mealsStore = useMealsStore()
 const groceryStore = useGroceryStore()
+const pantryStore = usePantryStore()
 
 const title = ref(props.meal.title)
 const mealType = ref(props.meal.meal_type ?? '')
 const isLoading = ref(false)
 const showGroceryPicker = ref(false)
+const showPantryPicker = ref(false)
 const selectedItemIds = ref<string[]>(props.linkedItemIds ? [...props.linkedItemIds] : [])
+const selectedPantryItemIds = ref<string[]>(props.linkedPantryItemIds ? [...props.linkedPantryItemIds] : [])
 
 async function handleSubmit() {
   isLoading.value = true
@@ -117,6 +142,7 @@ async function handleSubmit() {
     })
     if (!mealsStore.error) {
       await groceryStore.linkMealToItems(props.meal.id, selectedItemIds.value)
+      await pantryStore.linkMealToItems(props.meal.id, selectedPantryItemIds.value)
       emit('close')
     }
   } finally {

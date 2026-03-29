@@ -43,6 +43,15 @@
       {{ linkedGroceryCount }}
     </span>
 
+    <!-- Linked pantry count badge -->
+    <span
+      v-if="linkedPantryCount && linkedPantryCount > 0"
+      data-testid="linked-pantry-count-badge"
+      class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-teal-100 text-teal-700"
+    >
+      {{ linkedPantryCount }}
+    </span>
+
     <!-- Edit button -->
     <button
       data-testid="edit-btn"
@@ -70,7 +79,7 @@
     </button>
 
     <!-- Edit modal -->
-    <MealEditModal v-if="showEdit" :meal="meal" :linked-item-ids="linkedItemIds" @close="showEdit = false" />
+    <MealEditModal v-if="showEdit" :meal="meal" :linked-item-ids="linkedItemIds" :linked-pantry-item-ids="linkedPantryItemIds" @close="showEdit = false" />
   </div>
 </template>
 
@@ -84,6 +93,8 @@ const props = defineProps<{
   meal: Meal
   linkedGroceryCount?: number
   linkedItemIds?: string[]
+  linkedPantryCount?: number
+  linkedPantryItemIds?: string[]
 }>()
 
 const mealsStore = useMealsStore()

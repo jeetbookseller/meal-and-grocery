@@ -29,6 +29,11 @@ const router = createRouter({
           component: () => import('@/views/GroceryListView.vue'),
         },
         {
+          path: 'pantry',
+          name: 'pantry',
+          component: () => import('@/views/PantryListView.vue'),
+        },
+        {
           path: '',
           redirect: 'meals',
         },
