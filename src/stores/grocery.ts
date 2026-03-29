@@ -133,7 +133,8 @@ export const useGroceryStore = defineStore('grocery', () => {
         .select()
         .single()
       if (insertError) throw insertError
-      items.value.push(data)
+      // Guard against duplicate: realtime INSERT event may have already added this item
+      if (!items.value.some(i => i.id === data.id)) items.value.push(data)
     } catch (e) {
       error.value = e instanceof Error ? e.message : (e as any)?.message ?? 'Failed to add item'
     }
