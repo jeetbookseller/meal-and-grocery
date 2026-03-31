@@ -2,7 +2,7 @@
   <div>
     <OfflineIndicator />
     <nav class="bg-surface border-b border-border px-4 flex items-center justify-between h-14">
-      <div class="flex gap-1 overflow-x-auto">
+      <div class="flex gap-1 overflow-x-auto min-w-0 scrollbar-hide">
         <RouterLink
           to="/app/meals"
           class="px-3 min-h-[44px] flex items-center rounded-md text-sm font-medium text-text-secondary hover:text-accent hover:bg-hover-bg transition-colors duration-150 whitespace-nowrap"
