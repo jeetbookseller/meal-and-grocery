@@ -26,7 +26,7 @@ For every task: **plan → tests → implement → document**
 
 ## Current Architecture
 
-**Design**: Anylist-style flat lists with Notion-style aesthetics. Both meals and groceries are simple, flat, checkable lists. No date grouping, no grocery sections. Meals support optional free-form type tags with a toggle to group by type.
+**Design**: Anylist-style flat lists with Notion-style aesthetics. Meals, groceries, and pantry are simple, flat, checkable lists. Discover tab shows a browsable recipe catalog with filtering. No date grouping, no grocery sections. Meals support optional free-form type tags with a toggle to group by type.
 
 ### Component Tree
 
@@ -41,11 +41,19 @@ App.vue
         │   ├── MealRow.vue             (checkbox + title + meal type badge + linked count + edit/delete)
         │   ├── MealEditModal.vue       (title + meal type input + linked grocery picker)
         │   └── ClearCheckedButton.vue
-        └── GroceryListView.vue         (Tab 2: /app/groceries)
-            ├── GroceryItem.vue         (checkbox + name + qty + store label + edit/delete + meal badges; hideStore prop)
-            ├── GroceryItemEditModal.vue (name, qty, store input w/ datalist autocomplete, linked meals)
-            ├── MealLinkPicker.vue      (modal for linking meals)
-            └── ClearCheckedButton.vue
+        ├── GroceryListView.vue         (Tab 2: /app/groceries)
+        │   ├── GroceryItem.vue         (checkbox + name + qty + store label + edit/delete + meal badges; hideStore prop)
+        │   ├── GroceryItemEditModal.vue (name, qty, store input w/ datalist autocomplete, linked meals)
+        │   ├── MealLinkPicker.vue      (modal for linking meals)
+        │   └── ClearCheckedButton.vue
+        ├── PantryListView.vue          (Tab 3: /app/pantry)
+        │   ├── PantryItem.vue          (checkbox + name + qty + meal badges + edit/delete)
+        │   ├── PantryItemEditModal.vue  (name, qty, linked meals)
+        │   ├── PantryLinkPicker.vue     (modal for linking pantry items to meals)
+        │   └── ClearCheckedButton.vue
+        └── FollowingView.vue           (Tab 4: /app/following — displayed as "Discover")
+            ├── MealCatalogCard.vue      (emoji + name + effort/protein badges + match badges + tags)
+            └── MealCatalogModal.vue     (add/edit custom recipe form)
 ```
 
 ### Store Structure
@@ -58,9 +66,14 @@ src/stores/
 ├── meals.ts      — meals[], groupedMeals (computed), mealTypeOptions (computed),
 │                   fetchMeals(), addMeal(), updateMeal(), deleteMeal(),
 │                   toggleChecked(), clearChecked(), Realtime
-└── grocery.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
-                    toggleChecked(), clearChecked(), linkItemToMeals(), Realtime,
-                    storeNames (computed: sorted deduped list of store names in use)
+├── grocery.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
+│                   toggleChecked(), clearChecked(), linkItemToMeals(), Realtime,
+│                   storeNames (computed: sorted deduped list of store names in use)
+├── pantry.ts     — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
+│                   toggleChecked(), clearChecked(), linkItemToMeals(), Realtime
+└── following.ts  — customItems[], items (seed + custom), effortFilter, proteinFilter,
+                    fridgeInput, filteredItems (computed), fetchCustomItems(), addItem(),
+                    updateItem(), deleteItem()
 ```
 
 ### Key Behaviors
@@ -71,6 +84,8 @@ src/stores/
 - **Store field**: grocery items have an optional free-text `store` field (e.g. "Trader Joe's"). In default mode the store name is shown as a muted label on the item row. A toggle button in the header switches between "Default" (flat) and "By Store" grouping — in By Store mode items are grouped under bold store headers (alphabetical, "No store" last), and the per-item store label is hidden (redundant with header). Store names autocomplete from previously-used values via an HTML `<datalist>`.
 - **Realtime**: both stores subscribe to Supabase Realtime channels on mount, handling INSERT/UPDATE/DELETE.
 - **Meal Types**: meals can optionally be tagged with a free-form type (e.g., Breakfast, Brunch, Snack, Dessert). Previously used types appear as autocomplete suggestions via datalist. The UI has a toggle to group meals by type — groups are sorted alphabetically with untyped meals in an "Other" group at the end.
+- **Pantry**: flat list of items at home. Same check/clear pattern as groceries. Items link to meals via `pantry_item_meals` junction table. No store field, no grouping. MealRow shows a teal pantry-count badge alongside the indigo grocery-count badge.
+- **Discover**: browse 21 built-in seed recipes + household custom recipes from Supabase `meal_catalog` table. Recipes have emoji, effort level (low/medium/high/one-pot), protein level, cook time, description, key ingredients, and tags. Filters: effort level, protein level, fridge sync (comma-separated ingredient input for matching). "COOK NOW" badge appears when >= 50% of ingredients match fridge input. Custom recipes are household-scoped CRUD via Supabase.
 - **Signup flow**: AuthForm shows password requirements indicators (min 15 chars, lowercase, uppercase, digit, symbol) and confirm password field during signup. Client-side validation blocks submit if password doesn't meet all requirements or fields don't match. On successful signup (when email confirmation is required), the form is replaced with a "check your email" success message. When returning from an email confirmation link, a "Email confirmed, please sign in" banner appears above the login form.
 
 ---
@@ -96,6 +111,14 @@ src/stores/
 9. **Email confirmation detection with hash router**: After email confirmation, Supabase redirects with `#access_token=...&type=signup` in the URL hash. `authStore.init()` captures `window.location.hash` **before** Supabase's `getSession()` parses and cleans it, checks for `type=signup` or `type=email_change`, sets `emailConfirmed = true`, then signs the user out so they see the login form with the confirmation banner. The `onAuthStateChange` listener is guarded to skip updates while `emailConfirmed` is true (prevents the sign-out event from resetting state).
 
 10. **Client-side password validation**: Password requirements (min 15 chars, lowercase, uppercase, digit, symbol) are enforced both client-side (AuthForm blocks submit) and server-side (Supabase rejects weak passwords). The client-side check is a UX convenience — Supabase remains the source of truth. Requirements are configurable in Supabase Dashboard > Authentication > Settings.
+
+11. **Pantry tab simplicity**: Intentionally simpler than Groceries — no store field, no sections, no grouping. Just a flat checkable list with meal linking. RLS on `pantry_item_meals` joins through `pantry_items` (same pattern as `grocery_item_meals`).
+
+12. **Discover: seed meals + custom recipes**: 21 seed recipes are bundled client-side in `src/data/seedMeals.ts`. Custom recipes persist in Supabase `meal_catalog` table (household-scoped with RLS). The `items` computed merges both sources.
+
+13. **Discover: fridge-based ingredient matching**: Instead of matching against pantry items, uses a free-text "fridge sync" input where users type comma-separated ingredients. The store computes match scores via substring matching against each recipe's `key_ingredients` array. Results are sorted by match score when fridge filter is active.
+
+14. **Discover: internal naming as "following"**: Route is `/app/following`, store is `following.ts`, but displayed as "Discover" in TopNav. This naming divergence is a historical artifact.
 
 ---
 
@@ -142,157 +165,12 @@ src/stores/
 | `src/stores/household.ts` | Provides `householdId` for all queries |
 | `src/stores/meals.ts` | Meal CRUD + realtime |
 | `src/stores/grocery.ts` | Grocery CRUD + realtime |
+| `supabase/migrations/005_pantry.sql` | Pantry items + junction table + RLS |
+| `src/stores/pantry.ts` | Pantry CRUD + realtime |
+| `supabase/migrations/006_meal_catalog.sql` | Discover custom recipes table + RLS |
+| `src/stores/following.ts` | Discover seed + custom recipe browsing + filtering |
+| `src/data/seedMeals.ts` | 21 bundled seed recipes for Discover |
 | `src/style.css` | Design tokens + component classes |
-
----
-
-## Pantry Tab — Implementation Plan (MVP)
-
-Track what food is already at home. Third tab alongside Meals and Groceries. Simpler than Groceries — no store field, no sections, no grouping. Just a flat checkable list with meal linking.
-
-### Step 1: Database Migration — `supabase/migrations/005_pantry.sql`
-
-**`pantry_items` table** (modeled after `grocery_items`, no `section_id` or `store`):
-- `id` uuid PK default `gen_random_uuid()`
-- `household_id` uuid NOT NULL FK → `households(id) ON DELETE CASCADE`
-- `name` text NOT NULL
-- `quantity` text (nullable)
-- `is_checked` bool NOT NULL DEFAULT false
-- `sort_order` int NOT NULL DEFAULT 0
-- `created_by` uuid FK → `auth.users(id)`
-- `created_at` timestamptz NOT NULL DEFAULT `now()`
-- Index on `household_id`
-
-**`pantry_item_meals` junction table** (modeled after `grocery_item_meals`):
-- `pantry_item_id` uuid FK → `pantry_items(id) ON DELETE CASCADE`
-- `meal_id` uuid FK → `meals(id) ON DELETE CASCADE`
-- Composite PK `(pantry_item_id, meal_id)`
-
-**RLS**: Same policy patterns as `grocery_items` and `grocery_item_meals` in `001_initial_schema.sql` (lines 214–281). 4 policies on `pantry_items` checking `household_members`, 3 policies on `pantry_item_meals` joining through `pantry_items`.
-
-**Realtime**: `ALTER PUBLICATION supabase_realtime ADD TABLE pantry_items;`
-
-### Step 2: TypeScript Types — `src/types/database.ts`
-
-Add after `GroceryItemMeal`:
-```typescript
-export interface PantryItem {
-  id: string
-  household_id: string
-  name: string
-  quantity: string | null
-  is_checked: boolean
-  sort_order: number
-  created_by: string
-  created_at: string
-}
-
-export interface PantryItemMeal {
-  pantry_item_id: string
-  meal_id: string
-}
-```
-Add `pantry_items` and `pantry_item_meals` entries to `Database['Tables']`.
-
-### Step 3: Pinia Store — `src/stores/pantry.ts` (NEW)
-
-Simplified copy of `src/stores/grocery.ts`. Strip out: sections, `store` field, `storeNames` computed, `_ensureUngroupedSection`.
-
-- **State**: `items` (PantryItem[]), `itemLinks`, `loading`, `error`
-- **Computed**: `itemMealLinks`, `mealPantryCounts`, `mealItemIds` — same logic as grocery store equivalents
-- **Methods**: `fetchItems()`, `fetchItemMealLinks()`, `addItem()`, `updateItem()`, `deleteItem()`, `toggleChecked()`, `clearChecked()`, `linkItemToMeals()`, `linkMealToItems()`, `subscribeRealtime()`, `unsubscribeRealtime()`
-- Realtime channels: `pantry-items-changes`, `pantry-item-meals-changes`
-
-### Step 4: Components
-
-#### 4a. `src/components/PantryItem.vue` (NEW)
-Simplified copy of `src/components/GroceryItem.vue`. No store badge, no `hideStore` prop. Uses `usePantryStore`.
-
-#### 4b. `src/components/pantry/PantryItemEditModal.vue` (NEW)
-Simplified copy of `src/components/grocery/GroceryItemEditModal.vue`. Only Name + Quantity fields (no Store). Reuses `MealLinkPicker.vue` as-is for meal linking.
-
-#### 4c. `src/components/pantry/PantryLinkPicker.vue` (NEW)
-Copy of `src/components/grocery/GroceryLinkPicker.vue` adapted for pantry items. Title: "Link to Pantry Items". Used by MealEditModal.
-
-### Step 5: View — `src/views/PantryListView.vue` (NEW)
-
-Simplified copy of `src/views/GroceryListView.vue`. No grouping toggle, no store-based grouping. Quick-add form (name only), flat sorted list, ClearCheckedButton at bottom. Empty state: "Your pantry is empty."
-
-### Step 6: Router — `src/router/index.ts`
-
-Add child route under `/app`:
-```typescript
-{ path: 'pantry', name: 'pantry', component: () => import('@/views/PantryListView.vue') }
-```
-
-### Step 7: TopNav — `src/components/TopNav.vue`
-
-Add third `RouterLink` to `/app/pantry` with text "Pantry", same styling as existing tabs.
-
-### Step 8: Meal Integration
-
-#### `src/components/MealRow.vue`
-- Add props: `linkedPantryCount?: number`, `linkedPantryItemIds?: string[]`
-- Add a second badge (green/teal tone) showing pantry count when > 0
-
-#### `src/components/MealEditModal.vue`
-- Add prop `linkedPantryItemIds?: string[]`
-- Add second link picker button → `PantryLinkPicker`
-- In `handleSubmit`, also call `pantryStore.linkMealToItems()`
-
-#### `src/views/MealPlanView.vue`
-- Import `usePantryStore`, fetch pantry items + links in `onMounted`
-- Pass `linkedPantryCount` and `linkedPantryItemIds` to every `MealRow`
-
-### Step 9: Tests
-
-- `src/tests/stores/pantry.test.ts` — mirror grocery store tests
-- `src/tests/components/PantryItem.test.ts`
-- `src/tests/components/PantryListView.test.ts`
-
-### Step 10: Update CLAUDE.md
-
-After implementation, update these sections:
-
-**Component Tree** — add under AppLayout:
-```
-├── PantryListView.vue          (Tab 3: /app/pantry)
-│   ├── PantryItem.vue          (checkbox + name + qty + meal badges + edit/delete)
-│   ├── PantryItemEditModal.vue (name, qty, linked meals)
-│   └── ClearCheckedButton.vue
-```
-
-**Store Structure** — add:
-```
-├── pantry.ts    — items[], fetchItems(), addItem(), updateItem(), deleteItem(),
-                   toggleChecked(), clearChecked(), linkItemToMeals(), Realtime
-```
-
-**Key Behaviors** — add: Pantry is a flat list of items at home. Same check/clear pattern as groceries. Items link to meals via `pantry_item_meals` junction table. No store field, no grouping.
-
-**Design Decisions** — add: Pantry tab is intentionally simpler than Groceries — no store field, no sections, no grouping. Just a flat checkable list with meal linking.
-
-**Critical Files** — add: `supabase/migrations/005_pantry.sql` and `src/stores/pantry.ts`.
-
-### Key Files to Reference (Templates)
-
-| New file | Copy/simplify from |
-|----------|-------------------|
-| `src/stores/pantry.ts` | `src/stores/grocery.ts` |
-| `src/components/PantryItem.vue` | `src/components/GroceryItem.vue` |
-| `src/components/pantry/PantryItemEditModal.vue` | `src/components/grocery/GroceryItemEditModal.vue` |
-| `src/components/pantry/PantryLinkPicker.vue` | `src/components/grocery/GroceryLinkPicker.vue` |
-| `src/views/PantryListView.vue` | `src/views/GroceryListView.vue` |
-
-### Verification
-
-1. Run `npm run test` — all existing + new tests pass
-2. Run `npm run dev` — verify 3 tabs render correctly
-3. Add pantry items, check/uncheck, clear checked
-4. Link pantry items to meals from both directions (PantryItemEditModal and MealEditModal)
-5. Verify MealRow shows both grocery and pantry count badges
-6. Open two tabs — verify Realtime sync for pantry items
-7. Run the migration SQL in Supabase dashboard before deploying
 
 ---
 
@@ -874,41 +752,12 @@ Smart Suggestions depends on all prior Discover features:
 
 ---
 
-## Next Steps (Supabase Dashboard Configuration)
-
-The enhanced signup flow requires these manual Supabase Dashboard settings to work end-to-end:
-
-### Email Confirmation (required)
-
-1. **Supabase Dashboard > Authentication > Settings**:
-   - Ensure "Enable email confirmations" is **ON** (enabled by default)
-   - Set minimum password length if you want something other than the default 6 characters
-
-2. **Supabase Dashboard > Authentication > URL Configuration**:
-   - Add site URL: `https://jeetbookseller.github.io/meal-and-grocery/`
-   - Add redirect URLs: `https://jeetbookseller.github.io/meal-and-grocery/` and `http://localhost:5173`
-   - These URLs are where Supabase redirects after the user clicks the email confirmation link
-
-3. **Supabase Dashboard > Authentication > Email Templates** (optional):
-   - Customize the "Confirm signup" email template (subject, body, branding)
-   - The default template works fine but can be personalized
-
-### Verification Checklist
-
-After configuring the dashboard:
-- [ ] Sign up with a new email — see "check your email" success message (not a redirect)
-- [ ] Receive confirmation email with a clickable link
-- [ ] Click the link — land on login page with "Email confirmed!" banner
-- [ ] Sign in with the confirmed email — redirect to `/app/meals`
-- [ ] Try signing up with a weak password (missing length/lowercase/uppercase/digit/symbol) — see inline requirement indicators and submit blocked
-- [ ] Try mismatched confirm password — see "Passwords do not match" error
-
----
-
 ## Deploy Steps
 
 1. Run pending Supabase migrations in the SQL editor (check `supabase/migrations/`)
-2. Configure Supabase Dashboard settings (see "Next Steps" above)
+2. Configure Supabase Dashboard auth settings: enable email confirmations, set site URL (`https://jeetbookseller.github.io/meal-and-grocery/`), add redirect URLs (production + `http://localhost:5173`)
 3. Push to `main` — GitHub Actions will auto-deploy to GitHub Pages
 4. Smoke test: add meals, check them off, clear checked, add grocery items, link to meals, verify realtime sync between two tabs
-5. Smoke test signup: create account, confirm email, verify login flow
+5. Smoke test pantry: add pantry items, check/uncheck, clear checked, link to meals from both directions, verify MealRow shows both grocery and pantry badges
+6. Smoke test discover: browse seed recipes, filter by effort/protein, add a custom recipe, test fridge sync ingredient matching
+7. Smoke test signup: create account, confirm email, verify login flow
