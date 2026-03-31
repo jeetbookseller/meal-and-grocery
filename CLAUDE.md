@@ -368,6 +368,170 @@ Social login requires OAuth credentials configured in external dashboards and Su
 1. Authentication > URL Configuration > Add redirect URLs: `https://jeetbookseller.github.io/meal-and-grocery/` and `http://localhost:5173`
 2. Authentication > Settings > Enable "Automatically link accounts with the same email"
 
+### Discover Meals from Pantry
+
+Suggest meals the user can cook based on what's currently available in their Pantry. Adds a "Discover" section/view that matches pantry items against a local recipe-ingredient dataset and ranks meals by ingredient coverage.
+
+#### Concept
+
+The user opens the Discover tab (or a section within the Meals tab). The app looks at all unchecked pantry items (i.e., items currently available at home), matches them against a built-in recipe database, and shows a ranked list of meals they can make — prioritizing meals where they already have most or all ingredients. Users can add a suggested meal directly to their meal plan and auto-generate grocery items for any missing ingredients.
+
+#### Data Model
+
+**No new DB tables for MVP.** Recipes live client-side as a static JSON dataset bundled with the app. This avoids Supabase complexity and keeps it fast.
+
+**`src/data/recipes.json`** (NEW) — Static dataset of recipes:
+```typescript
+interface Recipe {
+  id: string                    // stable slug, e.g. "chicken-stir-fry"
+  name: string                  // "Chicken Stir Fry"
+  ingredients: RecipeIngredient[]
+  meal_type?: string            // optional, e.g. "Dinner", "Breakfast"
+  tags?: string[]               // optional, e.g. ["quick", "asian", "vegetarian"]
+  source?: string               // optional URL or book reference
+}
+
+interface RecipeIngredient {
+  name: string                  // normalized ingredient name, e.g. "chicken breast"
+  quantity?: string             // e.g. "2 lbs", "1 cup"
+  optional?: boolean            // optional ingredients don't count against coverage
+}
+```
+
+Start with 30–50 common recipes. The dataset can grow over time. Keep ingredient names normalized (lowercase, singular) for matching.
+
+**Future: `recipes` table in Supabase** — If users want to add/edit custom recipes, migrate the dataset to a `recipes` table with `recipe_ingredients` join table, scoped to household. But for MVP, static JSON is simpler and faster.
+
+#### Matching Algorithm — `src/lib/recipeMatch.ts` (NEW)
+
+```typescript
+interface RecipeMatch {
+  recipe: Recipe
+  score: number                 // 0–1, fraction of required ingredients available
+  matchedIngredients: string[]  // ingredient names found in pantry
+  missingIngredients: string[]  // ingredient names NOT in pantry
+}
+
+function matchRecipes(recipes: Recipe[], pantryItems: PantryItem[]): RecipeMatch[]
+```
+
+**Matching logic:**
+1. Build a set of normalized pantry item names (lowercase, trimmed, singularized via simple rules like stripping trailing "s"/"es")
+2. For each recipe, check each non-optional ingredient against the pantry set using fuzzy substring matching (e.g., pantry has "chicken" → matches "chicken breast")
+3. Score = `matchedCount / requiredIngredientCount` (skip optional ingredients in denominator)
+4. Sort results by score descending, then alphabetically for ties
+5. Filter out recipes with score = 0 (no pantry items match at all)
+
+**Normalization helpers** (same file):
+- `normalizeIngredient(name: string): string` — lowercase, trim, strip plurals, remove common qualifiers ("fresh", "frozen", "canned", "diced", "sliced")
+- `fuzzyMatch(pantryName: string, ingredientName: string): boolean` — returns true if either contains the other after normalization, or if Levenshtein distance ≤ 2 for short names
+
+#### Component Tree (additions)
+
+```
+App.vue
+└── router-view
+    └── AppLayout.vue
+        ├── TopNav.vue                     (add Discover tab)
+        └── DiscoverView.vue               (Tab 4: /app/discover)
+            ├── DiscoverFilters.vue        (meal type filter, min-coverage slider, search box)
+            ├── RecipeCard.vue             (recipe name, coverage %, matched/missing lists, action buttons)
+            │   ├── IngredientTag.vue      (green = in pantry, red = missing, gray = optional)
+            │   └── AddMealButton.vue      (adds to meal plan + generates grocery items for missing)
+            └── EmptyState.vue             ("Add items to your Pantry to get meal suggestions")
+```
+
+#### Store — `src/stores/discover.ts` (NEW)
+
+- **State**: `recipes` (Recipe[]), `filters` ({ mealType, minCoverage, searchQuery }), `loading`
+- **Computed**:
+  - `matches` — calls `matchRecipes()` with current pantry items and applies filters
+  - `mealTypeOptions` — deduped meal types from recipe dataset
+- **Methods**:
+  - `loadRecipes()` — imports static JSON (lazy-loaded)
+  - `addToMealPlan(recipe: Recipe)` — creates a meal via `mealStore.addMeal()` with recipe name and meal_type, returns the new meal ID
+  - `addMissingToGrocery(match: RecipeMatch, mealId?: string)` — for each missing ingredient, calls `groceryStore.addItem()` with ingredient name/quantity, optionally links to the meal via `groceryStore.linkItemToMeals()`
+  - `addToPlanWithGroceries(match: RecipeMatch)` — combines both: adds meal, then adds missing ingredients as grocery items linked to that meal
+
+#### Components
+
+**`src/views/DiscoverView.vue`** (NEW):
+- On mount: load recipes, read pantry items from `usePantryStore()`
+- Show total pantry item count and number of matching recipes as a summary bar
+- List `RecipeCard` components sorted by coverage score
+- If pantry is empty, show empty state prompting user to add pantry items first
+
+**`src/components/discover/DiscoverFilters.vue`** (NEW):
+- Meal type dropdown (All / Breakfast / Lunch / Dinner / etc.) — options from recipe dataset
+- Minimum coverage slider (0%–100%, default 50%) — hide recipes below threshold
+- Search box — filters by recipe name substring
+- All filters are reactive and update the `matches` computed instantly
+
+**`src/components/discover/RecipeCard.vue`** (NEW):
+- Recipe name as heading
+- Coverage bar: colored progress bar (green ≥80%, yellow 50–79%, orange <50%)
+- Ingredient list with color-coded tags:
+  - Green tag: ingredient available in pantry
+  - Red tag: ingredient missing (needs to be bought)
+  - Gray tag: optional ingredient (not counted in score)
+- Action buttons:
+  - "Add to Meals" — adds recipe as a meal to the meal plan
+  - "Add Missing to Grocery List" — creates grocery items for all missing ingredients
+  - "Add to Meals + Grocery" — does both, linking the grocery items to the new meal
+- After adding, buttons change to "Added ✓" (disabled) to prevent duplicates in same session
+
+**`src/components/discover/IngredientTag.vue`** (NEW):
+- Small pill/badge component: icon + ingredient name + optional quantity
+- Color variants: green (available), red (missing), gray (optional)
+
+#### Router — `src/router/index.ts`
+
+Add child route under `/app`:
+```typescript
+{ path: 'discover', name: 'discover', component: () => import('@/views/DiscoverView.vue') }
+```
+
+#### TopNav — `src/components/TopNav.vue`
+
+Add fourth `RouterLink` to `/app/discover` with text "Discover", same styling as existing tabs.
+
+#### Code Changes Summary
+
+| File | Change |
+|------|--------|
+| `src/data/recipes.json` | NEW — Static recipe dataset (30–50 recipes with normalized ingredients) |
+| `src/lib/recipeMatch.ts` | NEW — `matchRecipes()`, `normalizeIngredient()`, `fuzzyMatch()` functions |
+| `src/stores/discover.ts` | NEW — Pinia store: loads recipes, computes matches against pantry, filters, add-to-plan actions |
+| `src/views/DiscoverView.vue` | NEW — Discover tab view with filters and recipe cards |
+| `src/components/discover/DiscoverFilters.vue` | NEW — Meal type, coverage slider, search filters |
+| `src/components/discover/RecipeCard.vue` | NEW — Recipe card with coverage bar, ingredient tags, action buttons |
+| `src/components/discover/IngredientTag.vue` | NEW — Color-coded ingredient pill component |
+| `src/components/TopNav.vue` | Add "Discover" tab link |
+| `src/router/index.ts` | Add `/app/discover` route |
+
+#### Tests
+
+- `src/tests/lib/recipeMatch.test.ts` — unit tests for matching algorithm: exact match, fuzzy match, normalization, scoring, sorting, optional ingredients, empty pantry
+- `src/tests/stores/discover.test.ts` — store tests: loading recipes, computing matches, filtering, `addToMealPlan`, `addMissingToGrocery`
+- `src/tests/components/DiscoverView.test.ts` — component tests: renders recipe cards, empty state, filter interactions
+- `src/tests/components/RecipeCard.test.ts` — component tests: coverage bar, ingredient tags, action button clicks
+
+#### Design Decisions
+
+1. **Static JSON over Supabase table**: No DB migration, no RLS policies, no realtime needed. Recipes are read-only reference data. Can migrate to Supabase later if users want custom recipes.
+2. **Fuzzy matching over exact**: Pantry items are free-text ("Chicken", "chicken breasts", "Chicken Breast"). Fuzzy substring matching with normalization handles this without requiring users to enter exact ingredient names.
+3. **Coverage score as primary sort**: Users care most about "what can I make right now?" — recipes with highest ingredient availability surface first.
+4. **One-click add to plan + grocery**: The key value prop is reducing friction. User sees a recipe, taps one button, and both the meal is planned and missing ingredients are added to the grocery list with links.
+5. **No external API for MVP**: Recipe data is bundled, not fetched from Spoonacular/Edamam/etc. Avoids API keys, rate limits, costs, and privacy concerns. The dataset is curated and small enough to ship with the app.
+
+#### Future Enhancements
+
+- **Custom recipes**: Let users add their own recipes (migrates to Supabase `recipes` + `recipe_ingredients` tables)
+- **Recipe API integration**: Pull from Spoonacular or Edamam for a larger recipe database, with caching
+- **Favorites**: Save recipes to a favorites list for quick re-use
+- **Cooking history**: Track which recipes were cooked (via meal plan) and suggest based on frequency/recency
+- **Smart suggestions**: Learn from user's meal history and pantry patterns to surface personalized recommendations
+
 ---
 
 ## Next Steps (Supabase Dashboard Configuration)
