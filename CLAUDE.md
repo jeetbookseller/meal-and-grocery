@@ -524,13 +524,353 @@ Add fourth `RouterLink` to `/app/discover` with text "Discover", same styling as
 4. **One-click add to plan + grocery**: The key value prop is reducing friction. User sees a recipe, taps one button, and both the meal is planned and missing ingredients are added to the grocery list with links.
 5. **No external API for MVP**: Recipe data is bundled, not fetched from Spoonacular/Edamam/etc. Avoids API keys, rate limits, costs, and privacy concerns. The dataset is curated and small enough to ship with the app.
 
-#### Future Enhancements
+### Custom Recipes
 
-- **Custom recipes**: Let users add their own recipes (migrates to Supabase `recipes` + `recipe_ingredients` tables)
-- **Recipe API integration**: Pull from Spoonacular or Edamam for a larger recipe database, with caching
-- **Favorites**: Save recipes to a favorites list for quick re-use
-- **Cooking history**: Track which recipes were cooked (via meal plan) and suggest based on frequency/recency
-- **Smart suggestions**: Learn from user's meal history and pantry patterns to surface personalized recommendations
+Let users create, edit, and share their own recipes within their household. Migrates the static recipe dataset to Supabase so recipes persist across devices and both household members can contribute.
+
+#### Database Migration — `supabase/migrations/006_custom_recipes.sql`
+
+**`recipes` table**:
+- `id` uuid PK default `gen_random_uuid()`
+- `household_id` uuid NOT NULL FK → `households(id) ON DELETE CASCADE`
+- `name` text NOT NULL
+- `meal_type` text (nullable) — e.g. "Dinner", "Breakfast"
+- `tags` text[] (nullable) — e.g. `{"quick", "vegetarian"}`
+- `source` text (nullable) — URL or book reference
+- `notes` text (nullable) — free-form cooking instructions or tips
+- `is_builtin` bool NOT NULL DEFAULT false — true for seeded recipes from static JSON
+- `created_by` uuid FK → `auth.users(id)`
+- `created_at` timestamptz NOT NULL DEFAULT `now()`
+- Index on `household_id`
+
+**`recipe_ingredients` table**:
+- `id` uuid PK default `gen_random_uuid()`
+- `recipe_id` uuid NOT NULL FK → `recipes(id) ON DELETE CASCADE`
+- `name` text NOT NULL — normalized ingredient name
+- `quantity` text (nullable) — e.g. "2 lbs", "1 cup"
+- `is_optional` bool NOT NULL DEFAULT false
+- `sort_order` int NOT NULL DEFAULT 0
+
+**RLS**: Same household-based policy pattern as `pantry_items`. 4 policies on `recipes` checking `household_members`. 3 policies on `recipe_ingredients` joining through `recipes → household_members`.
+
+**Seed migration**: Insert the static `recipes.json` data into `recipes` + `recipe_ingredients` with `is_builtin = true` for each household on first load (or via a one-time store action).
+
+#### Data Flow
+
+- On first use, `discoverStore.init()` checks if the household has any `is_builtin` recipes. If not, seeds them from the static JSON dataset via bulk insert.
+- After seeding, all recipe reads come from Supabase, not static JSON.
+- Custom recipes (`is_builtin = false`) are fully editable. Built-in recipes can be edited (creates a household-specific copy) or hidden.
+
+#### Components
+
+**`src/components/discover/RecipeEditModal.vue`** (NEW):
+- Name, meal type (with datalist autocomplete from existing types), tags (comma-separated input), source URL, notes textarea
+- Dynamic ingredient list: add/remove/reorder rows, each with name + quantity + optional checkbox
+- Save calls `discoverStore.saveRecipe()` which upserts to Supabase
+
+**`src/views/DiscoverView.vue`** (MODIFY):
+- Add "New Recipe" button in header → opens `RecipeEditModal`
+- Add edit icon on `RecipeCard` for custom recipes → opens `RecipeEditModal` pre-filled
+- Add delete action for custom recipes (with confirmation dialog)
+
+#### Store Changes — `src/stores/discover.ts`
+
+- **State**: Add `customRecipes` array (or merge into existing `recipes`)
+- **Methods**: Add `saveRecipe()`, `deleteRecipe()`, `seedBuiltinRecipes()`, `fetchRecipes()`
+- **Realtime**: Subscribe to `recipes` and `recipe_ingredients` changes so both household members see new recipes instantly
+- Remove static JSON import once migration is run; keep JSON as fallback for offline/seeding
+
+#### Code Changes Summary
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/006_custom_recipes.sql` | NEW — `recipes` + `recipe_ingredients` tables with RLS |
+| `src/types/database.ts` | Add `Recipe`, `RecipeIngredient` DB interfaces |
+| `src/stores/discover.ts` | Switch from static JSON to Supabase queries, add CRUD methods + realtime |
+| `src/components/discover/RecipeEditModal.vue` | NEW — Form for creating/editing recipes with dynamic ingredient list |
+| `src/views/DiscoverView.vue` | Add "New Recipe" button, edit/delete actions on cards |
+| `src/data/recipes.json` | Keep as seed data source, no longer primary data store |
+
+#### Tests
+
+- `src/tests/stores/discover.test.ts` — Add tests for `saveRecipe`, `deleteRecipe`, `seedBuiltinRecipes`, `fetchRecipes`, realtime handling
+- `src/tests/components/RecipeEditModal.test.ts` — Form validation, dynamic ingredient rows, save/cancel behavior
+
+#### Design Decisions
+
+1. **`is_builtin` flag**: Lets the app seed common recipes for new households without mixing them with user content. Users can edit built-in recipes (creating a household copy) or hide them.
+2. **Household-scoped recipes**: Both household members see and can edit all recipes. No per-user recipe ownership — keeps it simple for a 2-person household.
+3. **Dynamic ingredient rows**: Ingredients are stored as separate rows (not JSON blob) so the matching algorithm can query them efficiently and they can be individually linked to pantry/grocery items in the future.
+
+### Recipe API Integration
+
+Pull recipes from an external API (Spoonacular or Edamam) to offer a much larger recipe catalog beyond the built-in dataset. Results are cached locally to minimize API calls.
+
+#### API Selection
+
+**Spoonacular** (recommended for MVP):
+- `GET /recipes/findByIngredients` — accepts a list of ingredients, returns recipes ranked by match. Directly maps to the Discover use case.
+- `GET /recipes/{id}/information` — full recipe details including ingredients with amounts.
+- Free tier: 150 requests/day. Sufficient for a 2-person household.
+- Returns structured ingredient data with normalized names — simplifies matching.
+
+**Edamam** (alternative):
+- `GET /api/recipes/v2?q={ingredients}` — search by ingredient keywords.
+- Free tier: 10,000 requests/month.
+- Better for dietary filter support (vegan, gluten-free, etc.).
+
+#### Architecture
+
+```
+User clicks "Search Online" in DiscoverView
+  → discoverStore.searchExternal(pantryIngredients)
+    → src/lib/recipeApi.ts → fetch Spoonacular API
+      → transform response → RecipeMatch[] format
+        → cache results in localStorage (TTL: 24h)
+          → display in DiscoverView alongside local matches
+```
+
+#### Implementation — `src/lib/recipeApi.ts` (NEW)
+
+```typescript
+interface ExternalRecipeResult {
+  id: number                      // Spoonacular recipe ID
+  name: string
+  imageUrl?: string
+  ingredients: RecipeIngredient[]
+  matchedIngredients: string[]
+  missingIngredients: string[]
+  score: number
+  sourceUrl?: string              // link to original recipe
+}
+
+function searchByIngredients(ingredients: string[]): Promise<ExternalRecipeResult[]>
+function getRecipeDetails(recipeId: number): Promise<ExternalRecipeResult>
+```
+
+**Caching** — `src/lib/recipeCache.ts` (NEW):
+- Cache key: sorted ingredient list hash (so same pantry → same cache hit)
+- Storage: `localStorage` with 24-hour TTL
+- Max entries: 50 (LRU eviction)
+- Cache is per-household (include `householdId` in key)
+
+#### Environment Variable
+
+- `VITE_SPOONACULAR_API_KEY` — API key stored in `.env` (not committed). For production, use a Supabase Edge Function as a proxy to keep the key server-side.
+
+#### Supabase Edge Function (production) — `supabase/functions/recipe-search/index.ts`
+
+To avoid exposing the API key in client-side code:
+- Edge Function receives ingredient list from client
+- Makes the Spoonacular API call server-side
+- Returns transformed results
+- Rate-limits per household (max 50 requests/day)
+
+#### Store Changes — `src/stores/discover.ts`
+
+- **State**: Add `externalResults` (ExternalRecipeResult[]), `externalLoading`, `externalError`
+- **Computed**: `allMatches` — merges local `matches` and `externalResults`, deduped by name similarity, sorted by score
+- **Methods**: Add `searchExternal()`, `clearExternalResults()`
+- **UI toggle**: "Local Only" vs "Include Online" toggle in DiscoverFilters
+
+#### Component Changes
+
+| File | Change |
+|------|--------|
+| `src/lib/recipeApi.ts` | NEW — Spoonacular API client with response transformation |
+| `src/lib/recipeCache.ts` | NEW — localStorage cache with TTL and LRU eviction |
+| `src/stores/discover.ts` | Add external search state, methods, merged computed |
+| `src/components/discover/DiscoverFilters.vue` | Add "Include Online Recipes" toggle |
+| `src/components/discover/RecipeCard.vue` | Add recipe image thumbnail, "Source" link, "External" badge |
+| `src/views/DiscoverView.vue` | Show external results section with loading spinner |
+| `supabase/functions/recipe-search/index.ts` | NEW — Edge Function proxy for API key security |
+| `.env.example` | Add `VITE_SPOONACULAR_API_KEY` placeholder |
+
+#### Tests
+
+- `src/tests/lib/recipeApi.test.ts` — Mock fetch, test response transformation, error handling, empty results
+- `src/tests/lib/recipeCache.test.ts` — Cache hit/miss, TTL expiry, LRU eviction
+- `src/tests/stores/discover.test.ts` — Add tests for `searchExternal`, merged results, loading/error states
+
+#### Design Decisions
+
+1. **Client-side caching before server-side**: localStorage cache reduces API calls significantly for a 2-user app. The pantry doesn't change frequently, so the same search results stay valid for hours.
+2. **Edge Function proxy for production**: API key in client code is acceptable for dev but not production. The Edge Function adds security without a full backend.
+3. **Merge, don't replace**: External results supplement local recipes, not replace them. Users see their custom/built-in recipes first, with online suggestions below.
+4. **No recipe saving by default**: External recipes are displayed but not persisted. Users can "Save to My Recipes" to copy into the `recipes` table (requires Custom Recipes feature).
+
+### Recipe Favorites
+
+Save frequently-used recipes to a favorites list for quick access without scrolling through the full Discover catalog.
+
+#### Database Migration — `supabase/migrations/007_recipe_favorites.sql`
+
+**`recipe_favorites` table**:
+- `user_id` uuid NOT NULL FK → `auth.users(id) ON DELETE CASCADE`
+- `recipe_id` uuid NOT NULL FK → `recipes(id) ON DELETE CASCADE`
+- `created_at` timestamptz NOT NULL DEFAULT `now()`
+- Composite PK `(user_id, recipe_id)`
+
+**RLS**: User can only read/write their own favorites. SELECT/INSERT/DELETE policies where `auth.uid() = user_id`.
+
+Note: Favorites are per-user (not per-household) — each person has their own favorites.
+
+#### Store Changes — `src/stores/discover.ts`
+
+- **State**: Add `favorites` (Set<string> of recipe IDs)
+- **Computed**: Add `favoriteRecipes` — filters `recipes` to only those in favorites set, with match scores
+- **Methods**: Add `toggleFavorite(recipeId)`, `fetchFavorites()`, `isFavorite(recipeId)` computed helper
+
+#### Component Changes
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/007_recipe_favorites.sql` | NEW — `recipe_favorites` table with per-user RLS |
+| `src/types/database.ts` | Add `RecipeFavorite` interface |
+| `src/stores/discover.ts` | Add favorites state, toggle/fetch methods |
+| `src/components/discover/RecipeCard.vue` | Add heart/star icon button (toggle favorite), filled when favorited |
+| `src/components/discover/DiscoverFilters.vue` | Add "Favorites Only" filter toggle |
+| `src/views/DiscoverView.vue` | Add "Favorites" section at top when favorites exist, collapsible |
+
+#### Design Decisions
+
+1. **Per-user, not per-household**: Favorites are personal preference. Each household member curates their own list.
+2. **Requires Custom Recipes migration**: Favorites FK to `recipes` table, so this depends on the Custom Recipes feature being implemented first.
+3. **No separate Favorites view**: Favorites are a filter within Discover, not a separate tab. Keeps navigation simple.
+
+### Cooking History
+
+Track which recipes have been cooked (via the meal plan) and use that data to surface suggestions based on frequency and recency.
+
+#### Database Migration — `supabase/migrations/008_cooking_history.sql`
+
+**`cooking_history` table**:
+- `id` uuid PK default `gen_random_uuid()`
+- `household_id` uuid NOT NULL FK → `households(id) ON DELETE CASCADE`
+- `recipe_id` uuid FK → `recipes(id) ON DELETE SET NULL` (nullable — keeps history even if recipe is deleted)
+- `meal_id` uuid FK → `meals(id) ON DELETE SET NULL` (nullable — keeps history even if meal is cleared)
+- `recipe_name` text NOT NULL — denormalized, so history survives recipe deletion
+- `cooked_at` timestamptz NOT NULL DEFAULT `now()`
+- `created_by` uuid FK → `auth.users(id)`
+- Index on `(household_id, cooked_at DESC)`
+
+**RLS**: Same household-based pattern as other tables.
+
+#### Automatic Tracking
+
+When a meal that was added from Discover (linked to a recipe) is checked off, automatically log a `cooking_history` entry. This happens in `mealStore.toggleChecked()` or `mealStore.clearChecked()`.
+
+**Linking meals to recipes**: Add `recipe_id` nullable column to `meals` table (new migration or part of `008`). When `discoverStore.addToMealPlan()` creates a meal, it sets `recipe_id`. When that meal is checked off, the store logs the cook event.
+
+#### Store — `src/stores/cookingHistory.ts` (NEW)
+
+- **State**: `history` (CookingHistoryEntry[]), `loading`
+- **Computed**:
+  - `recipeFrequency` — Map<recipeId, count> of how often each recipe was cooked
+  - `lastCooked` — Map<recipeId, Date> of when each recipe was last cooked
+  - `topRecipes` — top 10 most frequently cooked recipes
+  - `recentRecipes` — last 10 cooked recipes (deduped)
+- **Methods**: `fetchHistory()`, `logCook(recipeId, mealId, recipeName)`, `subscribeRealtime()`
+
+#### Integration with Discover
+
+`discoverStore` gains a new computed `suggestedRecipes`:
+- Boosts score for recipes cooked frequently (familiarity signal)
+- Boosts score for recipes NOT cooked recently (variety signal)
+- Combined: `finalScore = coverageScore * 0.6 + frequencyBoost * 0.2 + varietyBoost * 0.2`
+- Tuning weights are constants in `recipeMatch.ts`, easy to adjust
+
+#### Component Changes
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/008_cooking_history.sql` | NEW — `cooking_history` table + `recipe_id` column on `meals` |
+| `src/types/database.ts` | Add `CookingHistoryEntry` interface, update `Meal` with optional `recipe_id` |
+| `src/stores/cookingHistory.ts` | NEW — History tracking store with frequency/recency computeds |
+| `src/stores/meals.ts` | In `toggleChecked`/`clearChecked`, log cook event if meal has `recipe_id` |
+| `src/stores/discover.ts` | Add `suggestedRecipes` computed using history data, update `addToMealPlan` to set `recipe_id` |
+| `src/views/DiscoverView.vue` | Add "Recently Cooked" and "Frequently Cooked" sections |
+| `src/components/discover/RecipeCard.vue` | Show "Cooked X times" and "Last cooked: date" metadata |
+
+#### Tests
+
+- `src/tests/stores/cookingHistory.test.ts` — Log events, frequency/recency computeds, realtime
+- `src/tests/stores/discover.test.ts` — Add tests for `suggestedRecipes` scoring with history data
+- `src/tests/stores/meals.test.ts` — Add tests for cook event logging on check-off
+
+#### Design Decisions
+
+1. **Denormalized `recipe_name`**: History entries keep the recipe name so they remain readable even if the recipe is deleted.
+2. **Automatic logging on meal check-off**: No manual "I cooked this" button. If a meal came from Discover (has `recipe_id`), checking it off = cooked it.
+3. **`recipe_id` on meals table**: Lightweight link between meals and recipes. Nullable so existing meals aren't affected.
+
+### Smart Suggestions
+
+Learn from the household's meal history and pantry patterns to surface personalized recipe recommendations. Combines cooking history, pantry frequency, seasonal patterns, and dietary preferences.
+
+#### Algorithm — `src/lib/smartSuggest.ts` (NEW)
+
+```typescript
+interface SuggestionContext {
+  pantryItems: PantryItem[]
+  cookingHistory: CookingHistoryEntry[]
+  currentMeals: Meal[]           // what's already on the meal plan
+  dayOfWeek: number              // 0=Sun, 6=Sat
+  favorites: Set<string>
+}
+
+interface ScoredSuggestion {
+  recipe: Recipe
+  score: number
+  reasons: string[]              // e.g. ["You have 4/5 ingredients", "Haven't made this in 3 weeks"]
+}
+
+function smartSuggest(recipes: Recipe[], context: SuggestionContext): ScoredSuggestion[]
+```
+
+**Scoring factors** (weighted, tunable):
+
+| Factor | Weight | Logic |
+|--------|--------|-------|
+| Ingredient coverage | 0.30 | Fraction of required ingredients in pantry (existing `matchRecipes` score) |
+| Freshness variety | 0.20 | Bonus for recipes not cooked in the last 2 weeks, penalty for cooked in last 3 days |
+| Frequency affinity | 0.15 | Slight boost for recipes cooked 2–5 times (proven favorites), no boost for >10 (overplayed) |
+| Favorite bonus | 0.10 | Flat boost if recipe is in user's favorites |
+| Meal plan diversity | 0.10 | Penalty if a recipe's `meal_type` is already on the current meal plan (avoid 3 dinners in a row) |
+| Day-of-week pattern | 0.10 | Learn from history: if user tends to cook "Pancakes" on Saturdays, boost on Saturday |
+| Tag matching | 0.05 | Boost "quick" recipes on weekdays, "elaborate" on weekends |
+
+**Reason strings**: Each factor that contributed significantly to the score generates a human-readable reason shown on the card (e.g., "You have 4 of 5 ingredients", "You haven't made this in 3 weeks", "Popular on Saturdays").
+
+#### Component Changes
+
+| File | Change |
+|------|--------|
+| `src/lib/smartSuggest.ts` | NEW — Multi-factor scoring algorithm with reason generation |
+| `src/stores/discover.ts` | Replace simple `matches` computed with `smartSuggest` output as the primary sort, keep basic coverage sort as a fallback/toggle |
+| `src/components/discover/RecipeCard.vue` | Show `reasons` as small text chips below the recipe name (e.g., "🥬 4/5 ingredients", "📅 New this week") |
+| `src/components/discover/DiscoverFilters.vue` | Add "Sort by: Smart / Coverage / Recent" dropdown |
+| `src/views/DiscoverView.vue` | Add "Suggested for You" hero section at top with top 3 smart suggestions |
+
+#### Tests
+
+- `src/tests/lib/smartSuggest.test.ts` — Unit tests for each scoring factor in isolation, combined scoring, reason generation, edge cases (empty history, no pantry, all recipes cooked recently)
+
+#### Design Decisions
+
+1. **All client-side**: No ML model, no server-side computation. The scoring is a weighted formula over simple signals. Fast enough for hundreds of recipes on any device.
+2. **Transparent reasons**: Users see *why* a recipe was suggested. Builds trust and helps them understand the system. No black-box recommendations.
+3. **Tunable weights as constants**: Weights are exported constants in `smartSuggest.ts`, easy to adjust based on user feedback without architectural changes.
+4. **Graceful degradation**: With no cooking history, falls back to coverage-only scoring (same as base Discover). Each signal is additive — the system gets smarter as more data accumulates but works fine from day one.
+5. **Day-of-week patterns**: Simple frequency count per recipe per day-of-week from `cooking_history`. No complex time-series analysis. If "Pancakes" was cooked on 3 out of 4 Saturdays, it gets a boost on Saturdays.
+
+#### Dependency Chain
+
+Smart Suggestions depends on all prior Discover features:
+1. **Discover Meals from Pantry** (base) → ingredient coverage scoring
+2. **Custom Recipes** → Supabase-backed recipe data
+3. **Recipe Favorites** → favorite signal
+4. **Cooking History** → frequency, recency, day-of-week signals
 
 ---
 
