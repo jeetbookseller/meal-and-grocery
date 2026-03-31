@@ -68,6 +68,21 @@ export interface PantryItemMeal {
   meal_id: string
 }
 
+export interface MealCatalogItem {
+  id: string
+  household_id: string | null
+  name: string
+  category: 'low' | 'medium' | 'high' | 'onepot'
+  protein: 'high' | 'medium' | 'low'
+  cook_time: string
+  emoji: string
+  description: string | null
+  key_ingredients: string[]
+  tags: string[]
+  created_by: string | null
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -110,6 +125,11 @@ export interface Database {
         Row: PantryItemMeal
         Insert: PantryItemMeal
         Update: Partial<PantryItemMeal>
+      }
+      meal_catalog: {
+        Row: MealCatalogItem
+        Insert: Omit<MealCatalogItem, 'id' | 'created_at'>
+        Update: Partial<Omit<MealCatalogItem, 'id' | 'created_at'>>
       }
     }
     Functions: {

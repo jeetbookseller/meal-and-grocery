@@ -34,6 +34,11 @@ const router = createRouter({
           component: () => import('@/views/PantryListView.vue'),
         },
         {
+          path: 'following',
+          name: 'following',
+          component: () => import('@/views/FollowingView.vue'),
+        },
+        {
           path: '',
           redirect: 'meals',
         },
