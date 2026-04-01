@@ -13,9 +13,10 @@ export default defineConfig({
       manifest: {
         name: 'Meal & Grocery Planner',
         short_name: 'MealPlanner',
-        theme_color: '#3b82f6',
-        background_color: '#ffffff',
+        theme_color: '#2383E2',
+        background_color: '#F7F7F5',
         display: 'standalone',
+        scope: '/meal-and-grocery/',
         start_url: '/meal-and-grocery/',
         icons: [
           {
@@ -27,13 +28,14 @@ export default defineConfig({
             src: '/meal-and-grocery/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any maskable',
           },
         ],
       },
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        navigateFallback: null,
+        navigateFallback: '/meal-and-grocery/index.html',
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.hostname.includes('supabase'),
