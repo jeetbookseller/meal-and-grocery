@@ -3,6 +3,13 @@ import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useHouseholdStore } from '@/stores/household'
 import type { PantryItem } from '@/types/database'
+import { useEditNotification } from '@/composables/useEditNotification'
+
+const recentOwnIds = new Set<string>()
+function trackOwnChange(id: string) {
+  recentOwnIds.add(id)
+  setTimeout(() => recentOwnIds.delete(id), 2000)
+}
 
 export const usePantryStore = defineStore('pantry', () => {
   const items = ref<PantryItem[]>([])
@@ -100,6 +107,7 @@ export const usePantryStore = defineStore('pantry', () => {
         .select()
         .single()
       if (insertError) throw insertError
+      trackOwnChange(data.id)
       // Guard against duplicate: realtime INSERT event may have already added this item
       if (!items.value.some(i => i.id === data.id)) items.value.push(data)
     } catch (e) {
@@ -112,6 +120,7 @@ export const usePantryStore = defineStore('pantry', () => {
     payload: Partial<Pick<PantryItem, 'name' | 'quantity' | 'is_checked'>>
   ) {
     error.value = null
+    trackOwnChange(id)
     const idx = items.value.findIndex(i => i.id === id)
     if (idx !== -1) items.value[idx] = { ...items.value[idx], ...payload }
     try {
@@ -127,6 +136,7 @@ export const usePantryStore = defineStore('pantry', () => {
 
   async function deleteItem(id: string) {
     error.value = null
+    trackOwnChange(id)
     const idx = items.value.findIndex(i => i.id === id)
     if (idx !== -1) items.value.splice(idx, 1)
     try {
@@ -150,6 +160,7 @@ export const usePantryStore = defineStore('pantry', () => {
     const householdId = useHouseholdStore().householdId
     if (!householdId) return
     error.value = null
+    items.value.filter(i => i.is_checked).forEach(i => trackOwnChange(i.id))
     items.value = items.value.filter(i => !i.is_checked)
     try {
       const { error: deleteError } = await supabase
@@ -216,14 +227,21 @@ export const usePantryStore = defineStore('pantry', () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pantry_items', filter: `household_id=eq.${householdId}` },
         (payload) => {
+          const { notify } = useEditNotification()
           if (payload.eventType === 'INSERT') {
-            const exists = items.value.some(i => i.id === (payload.new as PantryItem).id)
-            if (!exists) items.value.push(payload.new as PantryItem)
+            const incoming = payload.new as PantryItem
+            if (!recentOwnIds.has(incoming.id)) notify('Pantry list was updated')
+            const exists = items.value.some(i => i.id === incoming.id)
+            if (!exists) items.value.push(incoming)
           } else if (payload.eventType === 'UPDATE') {
-            const idx = items.value.findIndex(i => i.id === (payload.new as PantryItem).id)
-            if (idx !== -1) items.value[idx] = payload.new as PantryItem
+            const incoming = payload.new as PantryItem
+            if (!recentOwnIds.has(incoming.id)) notify('Pantry list was updated')
+            const idx = items.value.findIndex(i => i.id === incoming.id)
+            if (idx !== -1) items.value[idx] = incoming
           } else if (payload.eventType === 'DELETE') {
-            const idx = items.value.findIndex(i => i.id === (payload.old as PantryItem).id)
+            const deletedId = (payload.old as PantryItem).id
+            if (!recentOwnIds.has(deletedId)) notify('Pantry list was updated')
+            const idx = items.value.findIndex(i => i.id === deletedId)
             if (idx !== -1) items.value.splice(idx, 1)
           }
         }

@@ -3,6 +3,13 @@ import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useHouseholdStore } from '@/stores/household'
 import type { GrocerySection, GroceryItem } from '@/types/database'
+import { useEditNotification } from '@/composables/useEditNotification'
+
+const recentOwnIds = new Set<string>()
+function trackOwnChange(id: string) {
+  recentOwnIds.add(id)
+  setTimeout(() => recentOwnIds.delete(id), 2000)
+}
 
 export const useGroceryStore = defineStore('grocery', () => {
   // Internal — never exposed publicly
@@ -133,6 +140,7 @@ export const useGroceryStore = defineStore('grocery', () => {
         .select()
         .single()
       if (insertError) throw insertError
+      trackOwnChange(data.id)
       // Guard against duplicate: realtime INSERT event may have already added this item
       if (!items.value.some(i => i.id === data.id)) items.value.push(data)
     } catch (e) {
@@ -145,6 +153,7 @@ export const useGroceryStore = defineStore('grocery', () => {
     payload: Partial<Pick<GroceryItem, 'name' | 'quantity' | 'store' | 'section_id' | 'is_checked'>>
   ) {
     error.value = null
+    trackOwnChange(id)
     const idx = items.value.findIndex(i => i.id === id)
     if (idx !== -1) items.value[idx] = { ...items.value[idx], ...payload }
     try {
@@ -160,6 +169,7 @@ export const useGroceryStore = defineStore('grocery', () => {
 
   async function deleteItem(id: string) {
     error.value = null
+    trackOwnChange(id)
     const idx = items.value.findIndex(i => i.id === id)
     if (idx !== -1) items.value.splice(idx, 1)
     try {
@@ -183,6 +193,7 @@ export const useGroceryStore = defineStore('grocery', () => {
     const householdId = useHouseholdStore().householdId
     if (!householdId) return
     error.value = null
+    items.value.filter(i => i.is_checked).forEach(i => trackOwnChange(i.id))
     items.value = items.value.filter(i => !i.is_checked)
     try {
       const { error: deleteError } = await supabase
@@ -249,14 +260,21 @@ export const useGroceryStore = defineStore('grocery', () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'grocery_items', filter: `household_id=eq.${householdId}` },
         (payload) => {
+          const { notify } = useEditNotification()
           if (payload.eventType === 'INSERT') {
-            const exists = items.value.some(i => i.id === (payload.new as GroceryItem).id)
-            if (!exists) items.value.push(payload.new as GroceryItem)
+            const incoming = payload.new as GroceryItem
+            if (!recentOwnIds.has(incoming.id)) notify('Grocery list was updated')
+            const exists = items.value.some(i => i.id === incoming.id)
+            if (!exists) items.value.push(incoming)
           } else if (payload.eventType === 'UPDATE') {
-            const idx = items.value.findIndex(i => i.id === (payload.new as GroceryItem).id)
-            if (idx !== -1) items.value[idx] = payload.new as GroceryItem
+            const incoming = payload.new as GroceryItem
+            if (!recentOwnIds.has(incoming.id)) notify('Grocery list was updated')
+            const idx = items.value.findIndex(i => i.id === incoming.id)
+            if (idx !== -1) items.value[idx] = incoming
           } else if (payload.eventType === 'DELETE') {
-            const idx = items.value.findIndex(i => i.id === (payload.old as GroceryItem).id)
+            const deletedId = (payload.old as GroceryItem).id
+            if (!recentOwnIds.has(deletedId)) notify('Grocery list was updated')
+            const idx = items.value.findIndex(i => i.id === deletedId)
             if (idx !== -1) items.value.splice(idx, 1)
           }
         }
