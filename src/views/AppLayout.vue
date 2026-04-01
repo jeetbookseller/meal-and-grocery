@@ -134,6 +134,8 @@
     <main v-else-if="householdStore.ready" class="p-4">
       <RouterView />
     </main>
+
+    <EditNotificationToast />
   </div>
 </template>
 
@@ -143,6 +145,7 @@ import { useHouseholdStore } from '@/stores/household'
 import TopNav from '@/components/TopNav.vue'
 import BaseSpinner from '@/components/base/BaseSpinner.vue'
 import BaseErrorBanner from '@/components/base/BaseErrorBanner.vue'
+import EditNotificationToast from '@/components/EditNotificationToast.vue'
 
 const householdStore = useHouseholdStore()
 const newHouseholdName = ref('')

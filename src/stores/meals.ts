@@ -4,6 +4,13 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { Meal } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import { useHouseholdStore } from '@/stores/household'
+import { useEditNotification } from '@/composables/useEditNotification'
+
+const recentOwnIds = new Set<string>()
+function trackOwnChange(id: string) {
+  recentOwnIds.add(id)
+  setTimeout(() => recentOwnIds.delete(id), 2000)
+}
 
 export const useMealsStore = defineStore('meals', () => {
   let channel: RealtimeChannel | null = null
@@ -63,6 +70,7 @@ export const useMealsStore = defineStore('meals', () => {
 
       if (insertError) throw new Error(insertError.message)
 
+      trackOwnChange(data.id)
       const idx = meals.value.findIndex((m) => m.id === tempId)
       if (idx !== -1) meals.value.splice(idx, 1, data)
     } catch (e) {
@@ -75,6 +83,7 @@ export const useMealsStore = defineStore('meals', () => {
     const idx = meals.value.findIndex((m) => m.id === id)
     if (idx === -1) return
 
+    trackOwnChange(id)
     const original = { ...meals.value[idx] }
     meals.value.splice(idx, 1, { ...original, ...payload })
 
@@ -101,6 +110,7 @@ export const useMealsStore = defineStore('meals', () => {
     const idx = meals.value.findIndex((m) => m.id === id)
     if (idx === -1) return
 
+    trackOwnChange(id)
     const removed = meals.value.splice(idx, 1)[0]
 
     try {
@@ -124,6 +134,7 @@ export const useMealsStore = defineStore('meals', () => {
     if (!checked.length) return
 
     const ids = checked.map((m) => m.id)
+    ids.forEach((id) => trackOwnChange(id))
     meals.value = meals.value.filter((m) => !m.is_checked)
 
     try {
@@ -186,8 +197,10 @@ export const useMealsStore = defineStore('meals', () => {
           filter: `household_id=eq.${householdStore.householdId}`,
         },
         (payload) => {
+          const { notify } = useEditNotification()
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const incoming = payload.new as Meal
+            if (!recentOwnIds.has(incoming.id)) notify('Meal list was updated')
             const idx = meals.value.findIndex((m) => m.id === incoming.id)
             if (idx !== -1) {
               meals.value.splice(idx, 1, incoming)
@@ -196,6 +209,7 @@ export const useMealsStore = defineStore('meals', () => {
             }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as { id: string }).id
+            if (!recentOwnIds.has(deletedId)) notify('Meal list was updated')
             meals.value = meals.value.filter((m) => m.id !== deletedId)
           }
         },
