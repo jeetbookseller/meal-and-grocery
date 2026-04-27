@@ -12,7 +12,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
         name: 'Meal & Grocery Planner',
-        short_name: 'MealPlanner',
+        short_name: 'Grocery',
         theme_color: '#2383E2',
         background_color: '#F7F7F5',
         display: 'standalone',
