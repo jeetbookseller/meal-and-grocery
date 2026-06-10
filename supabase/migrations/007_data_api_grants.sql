@@ -29,10 +29,31 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
 TO authenticated, service_role;
 
 -- RPC functions invoked from the client via supabase.rpc().
--- (seed_default_sections and set_updated_at are internal-only —
--- called from a SECURITY DEFINER function / trigger — no grant needed.)
 GRANT EXECUTE ON FUNCTION
   public.create_household(text),
   public.join_household(text),
   public.regenerate_invite_code(uuid)
 TO authenticated, service_role;
+
+-- Postgres grants EXECUTE to PUBLIC by default, which exposes
+-- SECURITY DEFINER functions to anonymous /rest/v1/rpc/ calls
+-- (flagged by the Supabase security advisor). Revoke it; the explicit
+-- grants above keep the client RPCs working for logged-in users.
+REVOKE EXECUTE ON FUNCTION
+  public.create_household(text),
+  public.join_household(text),
+  public.regenerate_invite_code(uuid),
+  public.seed_default_sections(uuid),
+  public.set_updated_at()
+FROM PUBLIC, anon;
+
+-- Internal-only functions must not be client-callable at all.
+-- seed_default_sections has no auth check (it is only safe when called
+-- inside create_household), and set_updated_at is a trigger function.
+-- Triggers and SECURITY DEFINER callers are unaffected: trigger EXECUTE
+-- is checked at CREATE TRIGGER time, and create_household runs as the
+-- function owner.
+REVOKE EXECUTE ON FUNCTION
+  public.seed_default_sections(uuid),
+  public.set_updated_at()
+FROM authenticated;
